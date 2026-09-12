@@ -1,0 +1,20 @@
+<Project>
+  <PropertyGroup>
+    <TargetFramework Condition="'$(TargetFramework)' == ''">net10.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>false</TreatWarningsAsErrors>
+    <WarningsAsErrors>CS8600;CS8602;CS8603;CS8618</WarningsAsErrors>
+    <EnforceCodeStyleInBuild>false</EnforceCodeStyleInBuild>
+    <GenerateDocumentationFile>false</GenerateDocumentationFile>
+    <!-- Invariant globalization is NOT enabled. Microsoft.Data.SqlClient refuses
+         to run in invariant mode ("Globalization Invariant Mode is not
+         supported"), and the rating traces format currency, which needs a real
+         culture. The Debian-based .NET images include ICU, so this costs nothing
+         here; a chiseled or Alpine base would need the ICU package added. -->
+    <InvariantGlobalization>false</InvariantGlobalization>
+    <Product>PolicyFlow POC</Product>
+    <Company>PolicyFlow (vendor-neutral demo)</Company>
+  </PropertyGroup>
+</Project>

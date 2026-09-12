@@ -1,0 +1,55 @@
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+#
+# ============================================================================
+# PolicyFlow legacy solution — Windows only.
+#
+# A SEPARATE solution from PolicyFlow.slnx, and kept OUT of the repository root
+# so that a bare `dotnet build` at the root is unambiguous.
+#
+# The legacy Web Forms project targets .NET Framework 4.8 and needs System.Web,
+# which exists only on Windows. Including it in the main solution would break
+# `dotnet build` and the CI pipeline on any non-Windows machine, and would fail
+# on a Windows machine without the .NET Framework 4.8 Developer Pack.
+#
+# Keeping it here means:
+#   * `dotnet build` on PolicyFlow.slnx stays green everywhere.
+#   * The CI pipeline does not need a Windows agent.
+#   * The legacy project is still a real, openable, buildable project rather
+#     than a folder of orphaned files.
+#
+# Prerequisites to build this solution:
+#   * Windows
+#   * Visual Studio 2022+ with the "ASP.NET and web development" workload,
+#     or MSBuild with the Web Deploy targets
+#   * .NET Framework 4.8 Developer Pack (targeting pack)
+#     https://dotnet.microsoft.com/download/dotnet-framework/net48
+#
+# Then:
+#   msbuild src\legacy\PolicyFlow.Legacy.sln /p:Configuration=Debug
+#
+# See docs/LEGACY-MODERNIZATION.md.
+# ============================================================================
+#
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "PolicyFlow.Legacy.WebForms", "PolicyFlow.Legacy.WebForms\PolicyFlow.Legacy.WebForms.csproj", "{7A3E9B41-2C58-4D6E-9F17-8B4C5D2E1A93}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{7A3E9B41-2C58-4D6E-9F17-8B4C5D2E1A93}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7A3E9B41-2C58-4D6E-9F17-8B4C5D2E1A93}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7A3E9B41-2C58-4D6E-9F17-8B4C5D2E1A93}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7A3E9B41-2C58-4D6E-9F17-8B4C5D2E1A93}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {B8D71C42-3F96-4A81-9E23-5C7A4D1B8E60}
+	EndGlobalSection
+EndGlobal

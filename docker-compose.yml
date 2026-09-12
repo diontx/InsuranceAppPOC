@@ -1,0 +1,209 @@
+# =============================================================================
+# PolicyFlow — local development stack.
+#
+#   cp .env.example .env     # then replace every <placeholder>
+#   docker compose up --build
+#
+# Then open http://localhost:8080
+#
+# Every credential comes from .env, which is git-ignored. No secret is written
+# in this file or in any appsettings.json.
+# =============================================================================
+
+name: policyflow
+
+services:
+  # ---------------------------------------------------------------------------
+  # SQL Server 2022 — relational transactional store (EF Core)
+  # ---------------------------------------------------------------------------
+  sql:
+    image: mcr.microsoft.com/mssql/server:2022-latest
+    container_name: policyflow-sql
+    environment:
+      ACCEPT_EULA: "Y"
+      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD:?MSSQL_SA_PASSWORD is required. Copy .env.example to .env.}
+      # Developer edition: free for non-production use and functionally identical
+      # to Enterprise for everything this POC exercises.
+      MSSQL_PID: Developer
+    ports:
+      # Exposed so `dotnet ef` and a SQL client on the host can reach it.
+      - "1433:1433"
+    volumes:
+      - sql-data:/var/opt/mssql
+    healthcheck:
+      # sqlcmd moved to /opt/mssql-tools18 and now requires -C to trust the
+      # container's self-signed certificate.
+      test:
+        [
+          "CMD-SHELL",
+          "/opt/mssql-tools18/bin/sqlcmd -S localhost -U sa -P \"$$MSSQL_SA_PASSWORD\" -C -Q 'SELECT 1' -b -o /dev/null"
+        ]
+      interval: 10s
+      timeout: 5s
+      # SQL Server takes 30-60s to accept connections on a cold start, so the
+      # retry budget has to be generous or dependents give up too early.
+      retries: 20
+      start_period: 30s
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # MongoDB — NoSQL carrier catalog and comparison read models (EF Core)
+  # ---------------------------------------------------------------------------
+  mongo:
+    image: mongo:8
+    container_name: policyflow-mongo
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: ${MONGO_INITDB_ROOT_USERNAME:?MONGO_INITDB_ROOT_USERNAME is required.}
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_INITDB_ROOT_PASSWORD:?MONGO_INITDB_ROOT_PASSWORD is required.}
+      MONGO_INITDB_DATABASE: ${MONGO_DATABASE:-policyflow_catalog}
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo-data:/data/db
+    healthcheck:
+      # `mongosh --eval` is authoritative: the port accepts connections before
+      # the server is ready to answer commands.
+      test:
+        [
+          "CMD-SHELL",
+          "mongosh --quiet --username $$MONGO_INITDB_ROOT_USERNAME --password $$MONGO_INITDB_ROOT_PASSWORD --authenticationDatabase admin --eval 'db.adminCommand({ping:1}).ok' | grep -q 1"
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 15s
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # Azure Service Bus emulator
+  # ---------------------------------------------------------------------------
+  # The emulator needs a SQL Server for its own metadata. It is pointed at the
+  # `sql` service above rather than running a second SQL container, which saves
+  # roughly 1.5GB and one more thing to wait for on startup.
+  servicebus-emulator:
+    image: mcr.microsoft.com/azure-messaging/servicebus-emulator:latest
+    container_name: policyflow-servicebus
+    environment:
+      ACCEPT_EULA: "Y"
+      SQL_SERVER: sql
+      MSSQL_SA_PASSWORD: ${MSSQL_SA_PASSWORD:?MSSQL_SA_PASSWORD is required.}
+    ports:
+      # AMQP over TCP.
+      - "5672:5672"
+      # Emulator health endpoint.
+      - "5300:5300"
+    volumes:
+      # Declares the namespace and the quote-submitted queue, including its
+      # 5-minute lock duration and MaxDeliveryCount of 5. Read-only: the
+      # container has no business rewriting its own configuration.
+      - ./infra/servicebus/config.json:/ServiceBus_Emulator/ConfigFiles/Config.json:ro
+    depends_on:
+      sql:
+        condition: service_healthy
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # PolicyFlow API
+  # ---------------------------------------------------------------------------
+  api:
+    build:
+      # Repository root, so project references across src/ resolve.
+      context: .
+      dockerfile: src/PolicyFlow.Api/Dockerfile
+    container_name: policyflow-api
+    environment:
+      ASPNETCORE_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
+      ASPNETCORE_HTTP_PORTS: "8080"
+
+      # --- Data stores. Hostnames are Compose service names on the shared
+      #     bridge network, so no host ports are involved.
+      SQL_CONNECTION_STRING: >-
+        Server=sql,1433;Database=${SQL_DB_NAME:-PolicyFlow};User Id=sa;Password=${MSSQL_SA_PASSWORD};TrustServerCertificate=True;Encrypt=True;MultipleActiveResultSets=True
+      MONGO_CONNECTION_STRING: >-
+        mongodb://${MONGO_INITDB_ROOT_USERNAME}:${MONGO_INITDB_ROOT_PASSWORD}@mongo:27017/?authSource=admin
+      MONGO_DATABASE: ${MONGO_DATABASE:-policyflow_catalog}
+
+      # --- Messaging. UseDevelopmentEmulator=true tells the SDK to skip TLS and
+      #     use the emulator's well-known local key.
+      SERVICEBUS_CONNECTION_STRING: ${SERVICEBUS_CONNECTION_STRING:?SERVICEBUS_CONNECTION_STRING is required.}
+      SERVICEBUS_QUEUE: ${SERVICEBUS_QUEUE:-quote-submitted}
+      SERVICEBUS_MAX_DELIVERY_COUNT: ${SERVICEBUS_MAX_DELIVERY_COUNT:-5}
+
+      # --- Security. The signing key simulates Entra ID locally; startup refuses
+      #     to accept a symmetric key outside Development.
+      JWT_ISSUER: ${JWT_ISSUER:-https://policyflow-local-idp}
+      JWT_AUDIENCE: ${JWT_AUDIENCE:-policyflow-api}
+      JWT_SIGNING_KEY: ${JWT_SIGNING_KEY:?JWT_SIGNING_KEY is required (32+ characters).}
+      JWT_TOKEN_LIFETIME_MINUTES: ${JWT_TOKEN_LIFETIME_MINUTES:-60}
+      ENABLE_DEV_TOKEN_ENDPOINT: ${ENABLE_DEV_TOKEN_ENDPOINT:-true}
+      REQUIRE_AUTHENTICATION: ${REQUIRE_AUTHENTICATION:-false}
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:8080,http://localhost:5173}
+      RATE_LIMIT_PERMIT_PER_MINUTE: ${RATE_LIMIT_PERMIT_PER_MINUTE:-120}
+      RATE_LIMIT_QUEUE_LIMIT: ${RATE_LIMIT_QUEUE_LIMIT:-10}
+
+      # --- Startup behaviour. Migrations run automatically only in Development;
+      #     StartupTasks refuses otherwise.
+      APPLY_MIGRATIONS_ON_STARTUP: ${APPLY_MIGRATIONS_ON_STARTUP:-true}
+      SEED_CARRIER_CATALOG: ${SEED_CARRIER_CATALOG:-true}
+    ports:
+      - "${API_HTTP_PORT:-8081}:8080"
+    depends_on:
+      sql:
+        condition: service_healthy
+      mongo:
+        condition: service_healthy
+      servicebus-emulator:
+        # service_started, not service_healthy: the emulator image ships no
+        # health check, so requiring one would wait forever. The API's own
+        # readiness probe verifies the queue is actually reachable.
+        condition: service_started
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # Underwriting worker
+  # ---------------------------------------------------------------------------
+  worker:
+    build:
+      context: .
+      dockerfile: src/PolicyFlow.Worker/Dockerfile
+    container_name: policyflow-worker
+    environment:
+      DOTNET_ENVIRONMENT: ${ASPNETCORE_ENVIRONMENT:-Development}
+      SQL_CONNECTION_STRING: >-
+        Server=sql,1433;Database=${SQL_DB_NAME:-PolicyFlow};User Id=sa;Password=${MSSQL_SA_PASSWORD};TrustServerCertificate=True;Encrypt=True;MultipleActiveResultSets=True
+      MONGO_CONNECTION_STRING: >-
+        mongodb://${MONGO_INITDB_ROOT_USERNAME}:${MONGO_INITDB_ROOT_PASSWORD}@mongo:27017/?authSource=admin
+      MONGO_DATABASE: ${MONGO_DATABASE:-policyflow_catalog}
+      SERVICEBUS_CONNECTION_STRING: ${SERVICEBUS_CONNECTION_STRING:?SERVICEBUS_CONNECTION_STRING is required.}
+      SERVICEBUS_QUEUE: ${SERVICEBUS_QUEUE:-quote-submitted}
+      SERVICEBUS_MAX_DELIVERY_COUNT: ${SERVICEBUS_MAX_DELIVERY_COUNT:-5}
+      # The worker never issues or validates tokens, so it gets no JWT settings.
+    depends_on:
+      # Waits for the API's readiness probe, which is also what guarantees
+      # migrations have been applied before the worker touches the schema.
+      api:
+        condition: service_healthy
+      servicebus-emulator:
+        condition: service_started
+    restart: unless-stopped
+
+  # ---------------------------------------------------------------------------
+  # React SPA behind nginx
+  # ---------------------------------------------------------------------------
+  web:
+    build:
+      context: src/PolicyFlow.Web
+      dockerfile: Dockerfile
+    container_name: policyflow-web
+    ports:
+      - "${WEB_HTTP_PORT:-8080}:8080"
+    depends_on:
+      api:
+        condition: service_started
+    restart: unless-stopped
+
+volumes:
+  # Named volumes, so `docker compose down` keeps the data and
+  # `docker compose down -v` deliberately discards it.
+  sql-data:
+  mongo-data:

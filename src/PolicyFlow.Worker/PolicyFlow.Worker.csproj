@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk.Worker">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <UserSecretsId>dotnet-PolicyFlow.Worker-022f24a4-28d2-4cd6-a160-5a1e3b2afe73</UserSecretsId>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Azure.Messaging.ServiceBus" Version="7.20.2" />
+    <PackageReference Include="Microsoft.Extensions.Hosting" Version="10.0.9" />
+    <PackageReference Include="Serilog.Extensions.Hosting" Version="10.0.0" />
+    <PackageReference Include="Serilog.Sinks.Console" Version="6.1.1" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\PolicyFlow.Application\PolicyFlow.Application.csproj" />
+    <ProjectReference Include="..\PolicyFlow.Domain\PolicyFlow.Domain.csproj" />
+    <ProjectReference Include="..\PolicyFlow.Infrastructure\PolicyFlow.Infrastructure.csproj" />
+    <ProjectReference Include="..\PolicyFlow.Infrastructure.NoSql\PolicyFlow.Infrastructure.NoSql.csproj" />
+  </ItemGroup>
+</Project>

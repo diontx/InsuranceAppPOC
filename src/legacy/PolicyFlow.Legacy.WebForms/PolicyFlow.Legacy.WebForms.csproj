@@ -1,0 +1,190 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+  ============================================================================
+  PolicyFlow legacy ASP.NET Web Forms application (.NET Framework 4.8)
+
+  This represents the "before" side of the modernization: a genuine Web Forms
+  application, with .aspx markup, code-behind, ViewState and postbacks, that has
+  been retrofitted to call the modern REST API through its compatibility seam
+  instead of holding business logic in its own code-behind.
+
+  ===========================================================================
+  THIS PROJECT IS NOT PART OF THE DEFAULT BUILD.
+
+  It is deliberately excluded from PolicyFlow.slnx, the Docker images and CI.
+  Reasons, in order of importance:
+
+    1. ASP.NET Web Forms requires the full .NET Framework and System.Web, which
+       exist only on Windows. It cannot run in the Linux containers this POC
+       uses, and POC-INSTRUCTIONS.md section 14 says explicitly not to try.
+    2. It needs MSBuild plus the .NET Framework 4.8 targeting pack; `dotnet
+       build` cannot compile it.
+    3. Keeping it out of the solution means `dotnet build` and the CI pipeline
+       stay green on any machine, Windows or not.
+
+  To build it on a Windows machine with Visual Studio or MSBuild plus the
+  .NET Framework 4.8 targeting pack:
+
+      msbuild src\legacy\PolicyFlow.Legacy.WebForms\PolicyFlow.Legacy.WebForms.csproj /p:Configuration=Debug
+
+  See docs/LEGACY-MODERNIZATION.md for what this project demonstrates and why
+  the seam is shaped the way it is.
+  ============================================================================
+-->
+<Project ToolsVersion="Current" DefaultTargets="Build"
+         xmlns="http://schemas.microsoft.com/developer/msbuild/2003">
+  <Import Project="$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props"
+          Condition="Exists('$(MSBuildExtensionsPath)\$(MSBuildToolsVersion)\Microsoft.Common.props')" />
+
+  <PropertyGroup>
+    <Configuration Condition=" '$(Configuration)' == '' ">Debug</Configuration>
+    <Platform Condition=" '$(Platform)' == '' ">AnyCPU</Platform>
+    <ProjectGuid>{7A3E9B41-2C58-4D6E-9F17-8B4C5D2E1A93}</ProjectGuid>
+    <ProjectTypeGuids>{349c5851-65df-11da-9384-00065b846f21};{fae04ec0-301f-11d3-bf4b-00c04f79efbc}</ProjectTypeGuids>
+    <OutputType>Library</OutputType>
+    <RootNamespace>PolicyFlow.Legacy.WebForms</RootNamespace>
+    <AssemblyName>PolicyFlow.Legacy.WebForms</AssemblyName>
+
+    <!--
+      .NET Framework 4.8 is the last Framework release and the realistic target
+      for a Web Forms estate that still needs to run. This is the constraint the
+      whole modernization strategy exists to work around: Web Forms was never
+      ported to .NET Core, so the migration path is extraction, not upgrade.
+    -->
+    <TargetFrameworkVersion>v4.8</TargetFrameworkVersion>
+
+    <UseIISExpress>true</UseIISExpress>
+    <IISExpressSSLPort>44390</IISExpressSSLPort>
+    <IISExpressAnonymousAuthentication>enabled</IISExpressAnonymousAuthentication>
+    <IISExpressWindowsAuthentication>disabled</IISExpressWindowsAuthentication>
+    <UseGlobalApplicationHostFile />
+    <FileUpgradeFlags></FileUpgradeFlags>
+    <UpgradeBackupLocation></UpgradeBackupLocation>
+    <OldToolsVersion>Current</OldToolsVersion>
+  </PropertyGroup>
+
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Debug|AnyCPU' ">
+    <DebugSymbols>true</DebugSymbols>
+    <DebugType>full</DebugType>
+    <Optimize>false</Optimize>
+    <OutputPath>bin\</OutputPath>
+    <DefineConstants>DEBUG;TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+
+  <PropertyGroup Condition=" '$(Configuration)|$(Platform)' == 'Release|AnyCPU' ">
+    <DebugType>pdbonly</DebugType>
+    <Optimize>true</Optimize>
+    <OutputPath>bin\</OutputPath>
+    <DefineConstants>TRACE</DefineConstants>
+    <ErrorReport>prompt</ErrorReport>
+    <WarningLevel>4</WarningLevel>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!--
+      System.Web is the assembly that makes this Windows-only. It carries the
+      page lifecycle, ViewState and the whole postback model, and has no .NET
+      Core equivalent.
+    -->
+    <Reference Include="System.Web" />
+    <Reference Include="System.Web.Extensions" />
+    <Reference Include="System" />
+    <Reference Include="System.Configuration" />
+    <Reference Include="System.Core" />
+    <Reference Include="System.Net.Http" />
+    <Reference Include="System.Runtime.Serialization" />
+    <Reference Include="System.Web.DynamicData" />
+    <Reference Include="System.Web.Services" />
+    <Reference Include="System.Xml" />
+    <Reference Include="System.Xml.Linq" />
+    <Reference Include="System.Data" />
+    <Reference Include="System.Data.DataSetExtensions" />
+    <Reference Include="System.Drawing" />
+    <Reference Include="System.ComponentModel.DataAnnotations" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="Web.config" />
+    <Content Include="Default.aspx" />
+    <Content Include="QuoteEntry.aspx" />
+    <Content Include="QuoteStatus.aspx" />
+    <Content Include="Site.master" />
+    <Content Include="Styles\legacy.css" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="Default.aspx.cs">
+      <DependentUpon>Default.aspx</DependentUpon>
+      <SubType>ASPXCodeBehind</SubType>
+    </Compile>
+    <Compile Include="Default.aspx.designer.cs">
+      <DependentUpon>Default.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="QuoteEntry.aspx.cs">
+      <DependentUpon>QuoteEntry.aspx</DependentUpon>
+      <SubType>ASPXCodeBehind</SubType>
+    </Compile>
+    <Compile Include="QuoteEntry.aspx.designer.cs">
+      <DependentUpon>QuoteEntry.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="QuoteStatus.aspx.cs">
+      <DependentUpon>QuoteStatus.aspx</DependentUpon>
+      <SubType>ASPXCodeBehind</SubType>
+    </Compile>
+    <Compile Include="QuoteStatus.aspx.designer.cs">
+      <DependentUpon>QuoteStatus.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="Site.master.cs">
+      <DependentUpon>Site.master</DependentUpon>
+      <SubType>ASPXCodeBehind</SubType>
+    </Compile>
+    <Compile Include="Site.master.designer.cs">
+      <DependentUpon>Site.master</DependentUpon>
+    </Compile>
+    <Compile Include="Global.asax.cs">
+      <DependentUpon>Global.asax</DependentUpon>
+    </Compile>
+    <Compile Include="Models\LegacyQuoteModels.cs" />
+    <Compile Include="Services\PolicyFlowApiClient.cs" />
+    <Compile Include="Properties\AssemblyInfo.cs" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="Global.asax" />
+  </ItemGroup>
+
+  <Import Project="$(MSBuildBinPath)\Microsoft.CSharp.targets" />
+
+  <!--
+    The web targets are imported only if they are actually present.
+
+    Condition="'$(VSToolsPath)' != ''" is the template default and is wrong here:
+    MSBuild sets VSToolsPath to a fallback path even when the Web Development
+    workload is not installed, so the condition passes and the import then fails
+    with MSB4226. Testing Exists() instead means the project still LOADS on a
+    machine without the workload and reports a clear, specific error from the
+    target below rather than an opaque import failure.
+  =========================================================================== -->
+  <Import Project="$(VSToolsPath)\WebApplications\Microsoft.WebApplication.targets"
+          Condition="Exists('$(VSToolsPath)\WebApplications\Microsoft.WebApplication.targets')" />
+
+  <!--
+    Prerequisite check. Builds on a machine that cannot compile Web Forms should
+    say so plainly, not fail somewhere deep in a target.
+  =========================================================================== -->
+  <Target Name="VerifyWebFormsPrerequisites" BeforeTargets="Build">
+    <Warning Condition="!Exists('$(VSToolsPath)\WebApplications\Microsoft.WebApplication.targets')"
+             Text="Microsoft.WebApplication.targets was not found. This project needs the Visual Studio 'ASP.NET and web development' workload (or the Web Deploy MSBuild targets). The class library will still compile, but .aspx precompilation and publishing are unavailable. This project is excluded from the default build by design — see docs/LEGACY-MODERNIZATION.md." />
+
+    <Error Condition="!Exists('$(TargetFrameworkRootPath)')
+                      AND !Exists('$(MSBuildProgramFiles32)\Reference Assemblies\Microsoft\Framework\.NETFramework\v4.8')"
+           Text="The .NET Framework 4.8 targeting pack is not installed, so this project cannot be compiled on this machine. Install it from https://dotnet.microsoft.com/download/dotnet-framework/net48 (Developer Pack), or build this project on a Windows machine with Visual Studio. The rest of the solution (PolicyFlow.slnx) does not depend on this project and builds without it." />
+  </Target>
+
+  <PropertyGroup>
+    <VisualStudioVersion Condition="'$(VisualStudioVersion)' == ''">10.0</VisualStudioVersion>
+    <VSToolsPath Condition="'$(VSToolsPath)' == ''">$(MSBuildExtensionsPath32)\Microsoft\VisualStudio\v$(VisualStudioVersion)</VSToolsPath>
+  </PropertyGroup>
+</Project>

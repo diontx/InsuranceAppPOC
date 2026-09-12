@@ -1,0 +1,220 @@
+/* ==========================================================================
+   PolicyFlow design tokens — corporate red / white / blue.
+   --------------------------------------------------------------------------
+   A deliberately restrained institutional palette. Navy carries structure and
+   trust, red is reserved for emphasis and action, and white does the work of
+   creating breathing room. Red is used sparingly on purpose: in an insurance
+   context red also signals error and decline, so spending it on decoration
+   would weaken the states that genuinely need to alarm.
+
+   Built mobile-first. Every size below is chosen so the quote-lookup flow is
+   comfortable one-handed on a phone, then scales up.
+   ========================================================================== */
+
+:root {
+  /* --- Brand: navy ------------------------------------------------------ */
+  --navy-950: #081426;
+  --navy-900: #0d2240;
+  --navy-800: #123258;
+  --navy-700: #1a4478;
+  --navy-600: #1f3c88;
+  --navy-500: #2e5fa7;
+  --navy-400: #5389c4;
+  --navy-300: #8db3da;
+  --navy-200: #c2d8ec;
+  --navy-100: #e3edf7;
+  --navy-050: #f2f7fc;
+
+  /* --- Brand: red ------------------------------------------------------- */
+  --red-900: #6d1420;
+  --red-800: #8c1d2c;
+  --red-700: #a81f2e;
+  --red-600: #c0392f;
+  --red-500: #d64545;
+  --red-200: #f3c4c4;
+  --red-100: #fbe7e7;
+
+  /* --- Neutrals --------------------------------------------------------- */
+  --white: #ffffff;
+  --grey-050: #f7f9fb;
+  --grey-100: #eef2f6;
+  --grey-200: #dfe5ec;
+  --grey-300: #c6cfda;
+  --grey-400: #9aa7b6;
+  --grey-500: #6b7888;
+  --grey-600: #4d5866;
+  --grey-700: #37414d;
+  --grey-900: #1b2027;
+
+  /* --- Status ----------------------------------------------------------- */
+  /* Green and amber are the only non-brand hues, and only for status. */
+  --success-700: #1c6b4a;
+  --success-100: #dff3e9;
+  --warning-700: #8a5a00;
+  --warning-100: #fdf0d5;
+  --danger-700: var(--red-800);
+  --danger-100: var(--red-100);
+  --info-700: var(--navy-700);
+  --info-100: var(--navy-100);
+
+  /* --- Semantic roles --------------------------------------------------- */
+  --bg-page: var(--grey-050);
+  --bg-surface: var(--white);
+  --bg-surface-alt: var(--navy-050);
+  --bg-inverse: var(--navy-900);
+
+  --text-primary: var(--grey-900);
+  --text-secondary: var(--grey-600);
+  --text-muted: var(--grey-500);
+  --text-on-dark: var(--white);
+  --text-on-dark-muted: var(--navy-200);
+
+  --border-subtle: var(--grey-200);
+  --border-default: var(--grey-300);
+  --border-strong: var(--navy-600);
+
+  --action-primary: var(--navy-600);
+  --action-primary-hover: var(--navy-700);
+  --action-primary-active: var(--navy-800);
+  --action-accent: var(--red-700);
+  --action-accent-hover: var(--red-800);
+
+  /* Focus ring. High contrast against both light surfaces and navy, because
+     keyboard users need to see it on every background in the app. */
+  --focus-ring: 0 0 0 3px rgba(31, 60, 136, 0.35);
+  --focus-ring-on-dark: 0 0 0 3px rgba(255, 255, 255, 0.6);
+
+  /* --- Spacing: 4px base scale ----------------------------------------- */
+  --space-1: 0.25rem;
+  --space-2: 0.5rem;
+  --space-3: 0.75rem;
+  --space-4: 1rem;
+  --space-5: 1.5rem;
+  --space-6: 2rem;
+  --space-7: 2.5rem;
+  --space-8: 3rem;
+  --space-10: 4rem;
+
+  /* --- Radii ------------------------------------------------------------ */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-pill: 999px;
+
+  /* --- Elevation -------------------------------------------------------- */
+  /* Soft, navy-tinted shadows. A neutral grey shadow reads as dirt against a
+     blue-leaning palette. */
+  --shadow-sm: 0 1px 2px rgba(13, 34, 64, 0.06), 0 1px 3px rgba(13, 34, 64, 0.08);
+  --shadow-md: 0 2px 4px rgba(13, 34, 64, 0.06), 0 4px 12px rgba(13, 34, 64, 0.1);
+  --shadow-lg: 0 8px 24px rgba(13, 34, 64, 0.14);
+
+  /* --- Type ------------------------------------------------------------- */
+  --font-sans: "Segoe UI", -apple-system, BlinkMacSystemFont, "Helvetica Neue",
+    Arial, sans-serif;
+  /* Tabular figures matter here: premium columns must align down the page. */
+  --font-mono: "Cascadia Mono", "SF Mono", "Roboto Mono", Consolas, monospace;
+
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-base: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.375rem;
+  --text-2xl: 1.75rem;
+  --text-3xl: 2.25rem;
+
+  --leading-tight: 1.2;
+  --leading-normal: 1.5;
+  --leading-relaxed: 1.65;
+
+  /* --- Layout ----------------------------------------------------------- */
+  --container-max: 1200px;
+  --container-narrow: 680px;
+  --header-height: 56px;
+
+  /* --- Motion ----------------------------------------------------------- */
+  --transition-fast: 120ms ease;
+  --transition-base: 200ms ease;
+}
+
+/* --------------------------------------------------------------------------
+   Reset
+   -------------------------------------------------------------------------- */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  /* Never below 16px: iOS Safari zooms the whole page when a focused input has
+     a smaller font size, which makes a mobile form feel broken. */
+  font-size: 100%;
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  font-size: var(--text-base);
+  line-height: var(--leading-normal);
+  color: var(--text-primary);
+  background: var(--bg-page);
+  -webkit-font-smoothing: antialiased;
+  /* Prevents the horizontal scroll a single overflowing table can cause on a
+     narrow phone. Wide content gets its own scroll container instead. */
+  overflow-x: hidden;
+}
+
+h1, h2, h3, h4 {
+  margin: 0;
+  line-height: var(--leading-tight);
+  font-weight: 600;
+  color: var(--navy-900);
+}
+
+h1 { font-size: var(--text-2xl); letter-spacing: -0.02em; }
+h2 { font-size: var(--text-xl); letter-spacing: -0.01em; }
+h3 { font-size: var(--text-lg); }
+h4 { font-size: var(--text-base); }
+
+p { margin: 0; }
+
+a {
+  color: var(--navy-600);
+  text-decoration: none;
+}
+
+a:hover { text-decoration: underline; }
+
+a:focus-visible,
+button:focus-visible,
+input:focus-visible,
+select:focus-visible,
+[tabindex]:focus-visible {
+  outline: 2px solid transparent;
+  box-shadow: var(--focus-ring);
+  border-radius: var(--radius-sm);
+}
+
+/* Larger type once there is room for it. */
+@media (min-width: 768px) {
+  :root {
+    --text-2xl: 2rem;
+    --text-3xl: 2.75rem;
+    --header-height: 64px;
+  }
+}
+
+/* Respect a reduced-motion preference: this app animates status transitions and
+   a polling spinner, both of which can be uncomfortable for some users. */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

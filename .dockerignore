@@ -1,0 +1,63 @@
+# =============================================================================
+# Files excluded from the Docker build context.
+#
+# This is not just a build-speed optimisation. Copying the host's bin/ and obj/
+# into the image overwrites the container's restore output with project.assets.json
+# files that reference Windows NuGet paths, and `dotnet publish --no-restore`
+# then fails with NETSDK1064 ("package ... was not found"). Excluding them is
+# what makes the build reproducible.
+# =============================================================================
+
+# --- .NET build output. See above: these MUST be excluded.
+**/bin/
+**/obj/
+artifacts/
+**/TestResults/
+**/*.trx
+**/coverage/
+
+# --- Node. node_modules is ~400MB and is reinstalled by `npm ci` in the image.
+**/node_modules/
+**/dist/
+**/.vite/
+**/npm-debug.log*
+
+# --- Secrets. Nothing that could carry a credential enters the build context.
+.env
+.env.*
+!.env.example
+**/*.pfx
+**/*.p12
+**/*.key
+**/*.pem
+**/secrets.json
+**/appsettings.Local.json
+**/appsettings.*.Local.json
+
+# --- Version control and CI.
+.git/
+.gitignore
+.github/
+azure-pipelines.yml
+
+# --- Editor and OS.
+.vs/
+.vscode/
+.idea/
+**/*.user
+**/*.suo
+**/.DS_Store
+**/Thumbs.db
+
+# --- Docs and the legacy Web Forms project.
+# The Web Forms project targets .NET Framework 4.8 and cannot build in a Linux
+# container. It is excluded so it can never be pulled into an image by accident.
+docs/
+src/legacy/
+*.md
+!README.md
+
+# --- Docker's own files.
+docker-compose*.yml
+**/Dockerfile
+.dockerignore

@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <!-- width=device-width is what makes the mobile layout work at all: without
+         it, a phone renders at a ~980px virtual viewport and zooms out.
+         maximum-scale is deliberately NOT set — blocking pinch-zoom is an
+         accessibility failure for anyone who needs to enlarge text. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#0d2240" />
+    <meta
+      name="description"
+      content="PolicyFlow — compare auto insurance coverage from five carriers in a single quote. Demonstration application; all carriers and rates are fictional."
+    />
+    <!-- Nothing here is public or should be indexed: it is a demo carrying
+         fictional insurance pricing. -->
+    <meta name="robots" content="noindex, nofollow" />
+    <title>PolicyFlow — Auto Insurance Marketplace</title>
+  </head>
+  <body>
+    <div id="root"></div>
+    <noscript>
+      PolicyFlow requires JavaScript. The quote workflow polls for asynchronous
+      underwriting results, which cannot be done without it.
+    </noscript>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

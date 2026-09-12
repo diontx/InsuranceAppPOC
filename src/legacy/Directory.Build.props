@@ -1,0 +1,56 @@
+<Project>
+  <!--
+    ===========================================================================
+    Build properties for the legacy .NET Framework tree.
+
+    This file deliberately SHADOWS the repository-root Directory.Build.props.
+    MSBuild stops walking up the directory tree at the first Directory.Build.props
+    it finds, and this one does not import the parent — which is the intent.
+
+    The root file configures modern .NET 10 projects, and three of its settings
+    are actively wrong for an ASP.NET Web Forms project on .NET Framework 4.8:
+
+      1. <Nullable>enable</Nullable> plus WarningsAsErrors=CS8618. Nullable
+         reference types postdate this framework by roughly a decade. The legacy
+         DTOs are nullable BY DESIGN: every field arrives from an old client as a
+         possibly-absent string, which is exactly why LegacyQuoteAdapter checks
+         each one with string.IsNullOrWhiteSpace before using it. Annotating them
+         would misrepresent the contract and change nothing about behaviour.
+
+      2. <TargetFramework>net10.0</TargetFramework>. The root file sets this when
+         the property is empty. Legacy projects use the OLD property name,
+         TargetFrameworkVersion, so the condition matched and set a conflicting
+         modern target framework on a project that cannot use one.
+
+      3. <ImplicitUsings>enable</ImplicitUsings>. Harmless here because every
+         legacy file has explicit using directives, but it is a modern C#
+         convenience that has no place in code meant to look its age.
+
+    Keeping the legacy settings separate is also honest about what this project
+    is. It is not modern code held back by configuration; it is code written for
+    a different era of the language, and the build should say so.
+    ===========================================================================
+  -->
+  <PropertyGroup>
+    <!-- No nullable reference types: this is .NET Framework 4.8 / C# as it was
+         written for Web Forms. -->
+    <Nullable>disable</Nullable>
+
+    <!-- No implicit usings. Every file declares what it needs. -->
+    <ImplicitUsings>disable</ImplicitUsings>
+
+    <!-- No nullable diagnostics promoted to errors. The root file promotes
+         CS8600/8602/8603/8618, all of which are nullable analysis. -->
+    <WarningsAsErrors></WarningsAsErrors>
+
+    <!-- C# 7.3 is the last version fully supported by the .NET Framework
+         compiler toolchain without workarounds, and is period-appropriate for a
+         Web Forms application of this vintage. It also guarantees no modern
+         language feature accidentally creeps into a project that is supposed to
+         demonstrate the "before" side of a modernization. -->
+    <LangVersion>7.3</LangVersion>
+
+    <Product>PolicyFlow POC — legacy portal</Product>
+    <Company>PolicyFlow (vendor-neutral demo)</Company>
+  </PropertyGroup>
+</Project>

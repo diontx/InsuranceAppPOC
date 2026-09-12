@@ -1,0 +1,15 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/PolicyFlow.Api/PolicyFlow.Api.csproj" />
+    <Project Path="src/PolicyFlow.Application/PolicyFlow.Application.csproj" />
+    <Project Path="src/PolicyFlow.Domain/PolicyFlow.Domain.csproj" />
+    <Project Path="src/PolicyFlow.Infrastructure.NoSql/PolicyFlow.Infrastructure.NoSql.csproj" />
+    <Project Path="src/PolicyFlow.Infrastructure/PolicyFlow.Infrastructure.csproj" />
+    <Project Path="src/PolicyFlow.Worker/PolicyFlow.Worker.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/PolicyFlow.Api.IntegrationTests/PolicyFlow.Api.IntegrationTests.csproj" />
+    <Project Path="tests/PolicyFlow.Application.Tests/PolicyFlow.Application.Tests.csproj" />
+    <Project Path="tests/PolicyFlow.Domain.Tests/PolicyFlow.Domain.Tests.csproj" />
+  </Folder>
+</Solution>

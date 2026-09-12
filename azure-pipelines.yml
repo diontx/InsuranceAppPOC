@@ -1,0 +1,382 @@
+# =============================================================================
+# PolicyFlow — Azure DevOps CI pipeline
+#
+# Validates backend, frontend and container builds, then publishes deployable
+# artifacts.
+#
+# NOTE ON PR VALIDATION
+# There is deliberately NO `pr:` trigger. For Azure Repos Git, pull-request
+# validation is configured through a BRANCH POLICY (Repos → Branches → main →
+# Branch policies → Build validation), not in YAML. A `pr:` trigger is the GitHub
+# convention and is silently ignored by Azure Repos, which is a common way to end
+# up believing PRs are validated when they are not.
+#
+# See docs/DEVOPS.md for the branch-policy setup.
+# =============================================================================
+
+trigger:
+  branches:
+    include:
+      - main
+      - feature/*
+      - release/*
+
+# Excluding docs-only changes from CI. A README edit does not need a container
+# build, and keeping runs meaningful keeps the free hosted-agent minutes useful.
+  paths:
+    exclude:
+      - docs/**
+      - '**/*.md'
+      - .gitignore
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+variables:
+  DOTNET_VERSION: '10.0.x'
+  NODE_VERSION: '20.x'
+  BUILD_CONFIGURATION: 'Release'
+  WEB_PROJECT: 'src/PolicyFlow.Web'
+
+  # Telemetry off and no first-run experience: both add latency to every agent
+  # job for no benefit in CI.
+  DOTNET_CLI_TELEMETRY_OPTOUT: 'true'
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 'true'
+  DOTNET_NOLOGO: 'true'
+
+  # NuGet packages cached on the agent between runs, keyed by lockfile content.
+  NUGET_PACKAGES: $(Pipeline.Workspace)/.nuget/packages
+
+stages:
+
+  # ===========================================================================
+  # Stage 1 — Backend
+  # ===========================================================================
+  - stage: Backend
+    displayName: 'Backend: build and test'
+    jobs:
+      - job: BuildAndTest
+        displayName: 'Build, unit tests, integration tests'
+        timeoutInMinutes: 25
+
+        # SQL Server as a service container. The integration tests MUST run
+        # against real SQL Server: the guarantees they cover — payment
+        # idempotency, duplicate-bind prevention, rowversion concurrency — are
+        # enforced by unique indexes that the in-memory provider does not have.
+        # Testing them against a fake would verify nothing.
+        services:
+          sql: sqlserver
+
+        variables:
+          # Generated per run rather than stored. This is a throwaway container
+          # that exists for the length of the job, and a pipeline secret for it
+          # would be a secret nobody needs to manage.
+          MSSQL_SA_PASSWORD: 'CI-P0licyFl0w-$(Build.BuildId)!'
+          TEST_SQL_SERVER: 'localhost,1433'
+
+        steps:
+          - checkout: self
+            fetchDepth: 1
+
+          - task: UseDotNet@2
+            displayName: 'Install .NET $(DOTNET_VERSION) SDK'
+            inputs:
+              packageType: 'sdk'
+              version: '$(DOTNET_VERSION)'
+
+          - task: Cache@2
+            displayName: 'Restore NuGet cache'
+            inputs:
+              # Keyed on the project files, so the cache invalidates when a
+              # dependency changes and not on every source edit.
+              key: 'nuget | "$(Agent.OS)" | **/*.csproj,!**/bin/**,!**/obj/**'
+              restoreKeys: |
+                nuget | "$(Agent.OS)"
+              path: '$(NUGET_PACKAGES)'
+
+          - script: dotnet restore PolicyFlow.slnx
+            displayName: 'dotnet restore'
+
+          - script: dotnet build PolicyFlow.slnx --configuration $(BUILD_CONFIGURATION) --no-restore
+            displayName: 'dotnet build'
+
+          # Domain and application tests need no infrastructure, so they run
+          # first and fail fast — no point starting SQL-dependent work if a
+          # rating rule is broken.
+          - script: |
+              dotnet test tests/PolicyFlow.Domain.Tests \
+                --configuration $(BUILD_CONFIGURATION) --no-build \
+                --logger "trx;LogFileName=domain.trx" \
+                --collect:"XPlat Code Coverage" \
+                --results-directory $(Agent.TempDirectory)/TestResults
+            displayName: 'Domain tests'
+
+          - script: |
+              dotnet test tests/PolicyFlow.Application.Tests \
+                --configuration $(BUILD_CONFIGURATION) --no-build \
+                --logger "trx;LogFileName=application.trx" \
+                --collect:"XPlat Code Coverage" \
+                --results-directory $(Agent.TempDirectory)/TestResults
+            displayName: 'Application tests'
+
+          # SQL Server in a container takes 30-60s to accept connections. Waiting
+          # explicitly turns a flaky "connection refused" into a deterministic
+          # failure with a clear message.
+          - script: |
+              echo "Waiting for SQL Server to accept connections..."
+              for i in $(seq 1 30); do
+                if docker exec $(docker ps -qf "ancestor=mcr.microsoft.com/mssql/server:2022-latest" | head -1) \
+                     /opt/mssql-tools18/bin/sqlcmd -S localhost -U sa \
+                     -P "$(MSSQL_SA_PASSWORD)" -C -Q "SELECT 1" -b > /dev/null 2>&1; then
+                  echo "SQL Server is ready after ${i} attempt(s)."
+                  exit 0
+                fi
+                sleep 3
+              done
+              echo "##vso[task.logissue type=error]SQL Server did not become ready within 90 seconds."
+              exit 1
+            displayName: 'Wait for SQL Server'
+
+          - script: |
+              dotnet test tests/PolicyFlow.Api.IntegrationTests \
+                --configuration $(BUILD_CONFIGURATION) --no-build \
+                --logger "trx;LogFileName=integration.trx" \
+                --collect:"XPlat Code Coverage" \
+                --results-directory $(Agent.TempDirectory)/TestResults
+            displayName: 'Integration tests (real SQL Server)'
+            env:
+              MSSQL_SA_PASSWORD: $(MSSQL_SA_PASSWORD)
+              TEST_SQL_SERVER: $(TEST_SQL_SERVER)
+
+          - task: PublishTestResults@2
+            displayName: 'Publish test results'
+            # always(): test results are most valuable precisely when the build
+            # failed. Skipping publication on failure hides the reason.
+            condition: always()
+            inputs:
+              testResultsFormat: 'VSTest'
+              testResultsFiles: '$(Agent.TempDirectory)/TestResults/*.trx'
+              mergeTestResults: true
+              failTaskOnFailedTests: true
+              testRunTitle: 'PolicyFlow backend'
+
+          - task: PublishCodeCoverageResults@2
+            displayName: 'Publish code coverage'
+            condition: always()
+            inputs:
+              summaryFileLocation: '$(Agent.TempDirectory)/TestResults/**/coverage.cobertura.xml'
+
+          # Publish output for the API and worker. Only what is deployable — the
+          # test projects and the legacy Web Forms project are excluded.
+          - script: |
+              dotnet publish src/PolicyFlow.Api/PolicyFlow.Api.csproj \
+                --configuration $(BUILD_CONFIGURATION) --no-build \
+                --output $(Build.ArtifactStagingDirectory)/api
+            displayName: 'Publish API'
+
+          - script: |
+              dotnet publish src/PolicyFlow.Worker/PolicyFlow.Worker.csproj \
+                --configuration $(BUILD_CONFIGURATION) --no-build \
+                --output $(Build.ArtifactStagingDirectory)/worker
+            displayName: 'Publish worker'
+
+          - publish: '$(Build.ArtifactStagingDirectory)/api'
+            artifact: api
+            displayName: 'Stage API artifact'
+
+          - publish: '$(Build.ArtifactStagingDirectory)/worker'
+            artifact: worker
+            displayName: 'Stage worker artifact'
+
+  # ===========================================================================
+  # Stage 2 — Frontend
+  # ===========================================================================
+  # Parallel with Backend: neither depends on the other, and running them
+  # concurrently roughly halves wall-clock time.
+  - stage: Frontend
+    displayName: 'Frontend: lint, test, build'
+    dependsOn: []
+    jobs:
+      - job: BuildAndTest
+        displayName: 'npm ci, lint, test, build'
+        timeoutInMinutes: 15
+
+        steps:
+          - checkout: self
+            fetchDepth: 1
+
+          - task: NodeTool@0
+            displayName: 'Install Node $(NODE_VERSION)'
+            inputs:
+              versionSpec: '$(NODE_VERSION)'
+
+          - task: Cache@2
+            displayName: 'Restore npm cache'
+            inputs:
+              key: 'npm | "$(Agent.OS)" | $(WEB_PROJECT)/package-lock.json'
+              restoreKeys: |
+                npm | "$(Agent.OS)"
+              path: '$(Pipeline.Workspace)/.npm'
+
+          # `npm ci`, not `npm install`: it installs exactly the locked versions
+          # and FAILS if the lockfile disagrees with package.json. A CI build that
+          # silently resolves a different dependency tree than the one that was
+          # tested is not a validation of anything.
+          - script: npm ci --cache $(Pipeline.Workspace)/.npm --prefer-offline
+            displayName: 'npm ci'
+            workingDirectory: '$(WEB_PROJECT)'
+
+          - script: npm run lint
+            displayName: 'npm run lint'
+            workingDirectory: '$(WEB_PROJECT)'
+
+          - script: npm run test:ci
+            displayName: 'npm run test:ci'
+            workingDirectory: '$(WEB_PROJECT)'
+
+          - task: PublishCodeCoverageResults@2
+            displayName: 'Publish frontend coverage'
+            condition: always()
+            inputs:
+              summaryFileLocation: '$(WEB_PROJECT)/coverage/cobertura-coverage.xml'
+
+          # Typechecks (tsc -b) and bundles. A type error fails the pipeline
+          # rather than shipping broken code.
+          - script: npm run build
+            displayName: 'npm run build'
+            workingDirectory: '$(WEB_PROJECT)'
+
+          - publish: '$(WEB_PROJECT)/dist'
+            artifact: web
+            displayName: 'Stage SPA artifact'
+
+  # ===========================================================================
+  # Stage 3 — Container validation
+  # ===========================================================================
+  - stage: Containers
+    displayName: 'Containers: validate and build'
+    # Runs only if both code stages passed. Building images for a broken
+    # commit wastes several minutes of agent time.
+    dependsOn:
+      - Backend
+      - Frontend
+    condition: succeeded()
+    jobs:
+      - job: DockerBuild
+        displayName: 'docker compose config and build'
+        timeoutInMinutes: 30
+
+        steps:
+          - checkout: self
+            fetchDepth: 1
+
+          # docker compose config substitutes variables and validates the file.
+          # The ${VAR:?error} guards in docker-compose.yml mean the placeholder
+          # values below are required for it to parse at all — which is the point:
+          # a missing variable fails here rather than at deploy time.
+          - script: |
+              cp .env.example .env
+              # CI-only placeholder values, sufficient for config validation and
+              # image builds. No container is started with them.
+              sed -i 's|<strong-local-sa-password>|CI-Validate-P0lic!|g'        .env
+              sed -i 's|<strong-local-mongo-password>|CI-Validate-M0ng0!|g'      .env
+              sed -i 's|<local-emulator-key>|SAS_KEY_VALUE|g'                    .env
+              sed -i 's|<local-dev-signing-key-min-32-chars>|ci-validation-signing-key-32-plus-chars|g' .env
+              docker compose config > /dev/null
+              echo "docker-compose.yml is valid."
+            displayName: 'docker compose config'
+
+          # Builds every image, which typechecks the frontend a second time
+          # inside the container and proves the Dockerfiles work from a clean
+          # context. Images are not pushed: this stage validates, it does not
+          # deploy.
+          - script: docker compose build --progress plain
+            displayName: 'docker compose build'
+
+          - script: |
+              echo "Built images:"
+              docker images --filter "reference=policyflow*" \
+                --format "table {{.Repository}}\t{{.Tag}}\t{{.Size}}"
+            displayName: 'Report image sizes'
+
+  # ===========================================================================
+  # Stage 4 — Deployment artifacts
+  # ===========================================================================
+  - stage: Package
+    displayName: 'Package deployment files'
+    dependsOn: Containers
+    # main only. A feature branch gets full validation but does not produce a
+    # deployment package.
+    condition: >-
+      and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+    jobs:
+      - job: Package
+        displayName: 'Publish deployment assets'
+        timeoutInMinutes: 10
+
+        steps:
+          - checkout: self
+            fetchDepth: 1
+
+          - script: |
+              mkdir -p $(Build.ArtifactStagingDirectory)/deploy
+              cp docker-compose.yml       $(Build.ArtifactStagingDirectory)/deploy/
+              cp .env.example             $(Build.ArtifactStagingDirectory)/deploy/
+              cp -r infra                 $(Build.ArtifactStagingDirectory)/deploy/
+              cp README.md                $(Build.ArtifactStagingDirectory)/deploy/
+
+              # Explicit guard, not a comment. If a .env ever reaches the build
+              # context this fails the pipeline rather than publishing a
+              # credential into a downloadable artifact.
+              if find $(Build.ArtifactStagingDirectory)/deploy -name '.env' -not -name '.env.example' | grep -q .; then
+                echo "##vso[task.logissue type=error]A .env file was found in the deployment package. Secrets must never be published."
+                exit 1
+              fi
+              echo "Deployment package contains no secrets."
+            displayName: 'Assemble deployment files'
+
+          - publish: '$(Build.ArtifactStagingDirectory)/deploy'
+            artifact: deploy
+            displayName: 'Stage deployment artifact'
+
+  # ===========================================================================
+  # Stage 5 — Optional dev deployment (manual)
+  # ===========================================================================
+  # Intentionally NOT automatic, and intentionally not wired to a real
+  # subscription in this repository.
+  #
+  # Infrastructure deployment must be an explicit decision: Azure Container Apps
+  # has a free monthly grant, but ancillary resources (Log Analytics, a container
+  # registry, public IPs) can still incur charges. An `environment:` with a
+  # manual approval gate makes that a deliberate act.
+  #
+  # To enable: create an Azure service connection, uncomment, and configure an
+  # approval check on the `policyflow-dev` environment.
+  # ===========================================================================
+  # - stage: DeployDev
+  #   displayName: 'Deploy to dev (manual approval)'
+  #   dependsOn: Package
+  #   condition: and(succeeded(), eq(variables['Build.SourceBranch'], 'refs/heads/main'))
+  #   jobs:
+  #     - deployment: DeployDev
+  #       environment: 'policyflow-dev'
+  #       strategy:
+  #         runOnce:
+  #           deploy:
+  #             steps:
+  #               - download: current
+  #                 artifact: deploy
+  #               - task: AzureCLI@2
+  #                 displayName: 'Deploy Bicep'
+  #                 inputs:
+  #                   azureSubscription: '<service-connection-name>'
+  #                   scriptType: bash
+  #                   scriptLocation: inlineScript
+  #                   inlineScript: |
+  #                     # Unique image tag per build. Never 'latest' as the only
+  #                     # tag: it makes rollback impossible and the running
+  #                     # version unidentifiable.
+  #                     az deployment group create \
+  #                       --resource-group policyflow-dev-rg \
+  #                       --template-file $(Pipeline.Workspace)/deploy/infra/azure/main.bicep \
+  #                       --parameters imageTag=$(Build.BuildId)

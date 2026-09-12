@@ -1,0 +1,43 @@
+# .NET
+bin/
+obj/
+*.user
+*.suo
+.vs/
+artifacts/
+TestResults/
+*.trx
+coverage*/
+*.coverage
+*.coveragexml
+
+# Node / React
+node_modules/
+dist/
+.vite/
+coverage/
+npm-debug.log*
+pnpm-debug.log*
+
+# Secrets & environment
+.env
+.env.local
+.env.*.local
+*.pfx
+*.p12
+*.key
+*.pem
+secrets.json
+appsettings.Local.json
+appsettings.*.Local.json
+
+# Legacy Web Forms
+src/legacy/**/packages/
+src/legacy/**/App_Data/
+*.dbmdl
+
+# OS / editors
+.DS_Store
+Thumbs.db
+*.swp
+.idea/

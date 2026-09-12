@@ -1,0 +1,319 @@
+/* ==========================================================================
+   Legacy agent portal styling.
+
+   Deliberately period-appropriate: table-based forms, a fixed-width feel, hard
+   borders, small type. It shares the red/white/blue corporate palette with the
+   modern SPA so the two are visibly the same organisation — the contrast is in
+   the interaction model and the density, not the brand.
+
+   It is minimally responsive (the tables reflow on a narrow screen) because a
+   real legacy portal usually got exactly that much attention and no more. The
+   difference from the mobile-first SPA is part of what the comparison shows.
+   ========================================================================== */
+
+body {
+  margin: 0;
+  padding: 0;
+  background: #eef2f6;
+  color: #1b2027;
+  font-family: Tahoma, Verdana, Segoe UI, sans-serif;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+/* --- Demo disclaimer ---------------------------------------------------- */
+
+.legacy-banner {
+  background: #fdf0d5;
+  border-bottom: 1px solid #8a5a00;
+  color: #8a5a00;
+  font-size: 11px;
+  font-weight: bold;
+  text-align: center;
+  padding: 4px 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+/* --- Header ------------------------------------------------------------- */
+
+.legacy-header {
+  background: #0d2240;
+  border-bottom: 3px solid #a81f2e;
+  color: #ffffff;
+  padding: 10px 0;
+}
+
+.legacy-header-inner {
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 0 12px;
+}
+
+.legacy-logo {
+  font-size: 20px;
+  font-weight: bold;
+  letter-spacing: -0.02em;
+}
+
+.legacy-logo-sub {
+  margin-left: 10px;
+  font-size: 11px;
+  color: #c2d8ec;
+  letter-spacing: 0.06em;
+}
+
+.legacy-build {
+  display: block;
+  margin-top: 3px;
+  font-size: 10px;
+  color: #8db3da;
+}
+
+/* --- Navigation --------------------------------------------------------- */
+
+.legacy-nav {
+  background: #123258;
+  border-bottom: 1px solid #081426;
+  padding: 0;
+  max-width: 980px;
+  margin: 0 auto;
+}
+
+.legacy-nav a {
+  display: inline-block;
+  padding: 7px 14px;
+  color: #c2d8ec;
+  font-size: 11px;
+  font-weight: bold;
+  text-decoration: none;
+  text-transform: uppercase;
+  border-right: 1px solid #1a4478;
+}
+
+.legacy-nav a:hover {
+  background: #1a4478;
+  color: #ffffff;
+}
+
+/* --- Content ------------------------------------------------------------ */
+
+.legacy-content {
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 14px 12px 30px;
+}
+
+/* --- Panels ------------------------------------------------------------- */
+
+.legacy-panel {
+  background: #ffffff;
+  border: 1px solid #9aa7b6;
+  margin-bottom: 14px;
+}
+
+.legacy-panel-header {
+  background: #1f3c88;
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: bold;
+  letter-spacing: 0.06em;
+  padding: 6px 10px;
+  border-bottom: 1px solid #0d2240;
+}
+
+.legacy-panel-body {
+  padding: 12px 10px;
+}
+
+.legacy-panel-body p {
+  margin: 0 0 8px;
+}
+
+/* --- Table-based forms -------------------------------------------------- */
+/* Layout tables, the Web Forms convention. Not accessible markup by modern
+   standards, which is itself part of the case for replacement. */
+
+.legacy-form {
+  border-collapse: collapse;
+  width: 100%;
+}
+
+.legacy-form td {
+  padding: 4px 6px;
+  vertical-align: middle;
+}
+
+.legacy-label {
+  width: 150px;
+  font-weight: bold;
+  color: #37414d;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.legacy-value {
+  color: #1b2027;
+}
+
+.legacy-value-strong {
+  font-weight: bold;
+  color: #0d2240;
+}
+
+.legacy-value-mono {
+  font-family: Consolas, "Courier New", monospace;
+  font-size: 11px;
+  color: #4d5866;
+  word-break: break-all;
+}
+
+.legacy-hint {
+  font-size: 10px;
+  color: #6b7888;
+  margin-left: 6px;
+}
+
+.legacy-note {
+  margin-top: 10px;
+  padding: 8px;
+  background: #f2f7fc;
+  border-left: 3px solid #2e5fa7;
+  font-size: 11px;
+  color: #37414d;
+}
+
+/* --- Inputs ------------------------------------------------------------- */
+
+.legacy-input {
+  border: 1px solid #6b7888;
+  padding: 3px 4px;
+  font-family: Tahoma, Verdana, sans-serif;
+  font-size: 12px;
+  background: #ffffff;
+  color: #1b2027;
+}
+
+.legacy-input:focus {
+  border-color: #1f3c88;
+  outline: 1px solid #1f3c88;
+}
+
+.legacy-input-mono {
+  font-family: Consolas, "Courier New", monospace;
+  text-transform: uppercase;
+}
+
+/* --- Buttons ------------------------------------------------------------ */
+
+.legacy-actions {
+  margin-top: 12px;
+  padding-top: 10px;
+  border-top: 1px solid #dfe5ec;
+}
+
+.legacy-button {
+  display: inline-block;
+  border: 1px solid #6b7888;
+  background: #eef2f6;
+  color: #37414d;
+  padding: 5px 14px;
+  margin-right: 6px;
+  font-family: Tahoma, Verdana, sans-serif;
+  font-size: 11px;
+  font-weight: bold;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.legacy-button:hover {
+  background: #dfe5ec;
+  text-decoration: none;
+}
+
+.legacy-button-primary {
+  background: #1f3c88;
+  border-color: #0d2240;
+  color: #ffffff;
+}
+
+.legacy-button-primary:hover {
+  background: #1a4478;
+}
+
+.legacy-button[disabled] {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* --- Validation and errors ---------------------------------------------- */
+
+.legacy-error {
+  background: #fbe7e7;
+  border: 1px solid #8c1d2c;
+  color: #8c1d2c;
+  padding: 8px 10px;
+  margin-bottom: 10px;
+  font-size: 11px;
+  font-weight: bold;
+}
+
+.legacy-error ul {
+  margin: 4px 0 0;
+  padding-left: 18px;
+  font-weight: normal;
+}
+
+.legacy-error-marker {
+  color: #a81f2e;
+  font-weight: bold;
+  margin-left: 4px;
+}
+
+.legacy-status-good { color: #1c6b4a; }
+.legacy-status-bad { color: #8c1d2c; }
+
+/* --- Footer ------------------------------------------------------------- */
+
+.legacy-footer {
+  max-width: 980px;
+  margin: 0 auto;
+  padding: 12px;
+  border-top: 1px solid #c6cfda;
+  color: #6b7888;
+  font-size: 10px;
+}
+
+.legacy-footer p {
+  margin: 0 0 4px;
+}
+
+/* --- Narrow screens ----------------------------------------------------- */
+/* The bare minimum: stack the label above its field so the form does not
+   overflow on a phone. A real legacy portal often did not even have this, and
+   comparing it with the mobile-first SPA is part of the point. */
+
+@media (max-width: 640px) {
+  .legacy-label {
+    width: auto;
+    text-align: left;
+    display: block;
+    padding-bottom: 0;
+  }
+
+  .legacy-form td {
+    display: block;
+    width: 100%;
+  }
+
+  .legacy-input {
+    width: 95% !important;
+  }
+
+  .legacy-nav a {
+    display: block;
+    border-right: none;
+    border-bottom: 1px solid #1a4478;
+  }
+}

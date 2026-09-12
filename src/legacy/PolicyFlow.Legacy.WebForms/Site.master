@@ -1,0 +1,65 @@
+<%--
+    Master page. The Web Forms equivalent of a layout component: content pages
+    fill the ContentPlaceHolder. Note that unlike a React component it cannot take
+    props, so anything a page needs to influence in the shell has to go through a
+    public property or a control lookup on the master.
+--%>
+<%@ Master Language="C#"
+           AutoEventWireup="true"
+           CodeBehind="Site.master.cs"
+           Inherits="PolicyFlow.Legacy.WebForms.SiteMaster" %>
+
+<!DOCTYPE html>
+<html lang="en">
+<head runat="server">
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title><asp:ContentPlaceHolder ID="TitleContent" runat="server">PolicyFlow Agent Portal</asp:ContentPlaceHolder></title>
+    <link rel="stylesheet" href="<%= ResolveUrl("~/Styles/legacy.css") %>" />
+    <asp:ContentPlaceHolder ID="HeadContent" runat="server" />
+</head>
+<body>
+    <%-- A single server-side form wrapping the whole page. This is the defining
+         structural constraint of Web Forms: one form per page, so every control
+         posts back to the same handler and independent forms are impossible. --%>
+    <form id="mainForm" runat="server">
+
+        <div class="legacy-banner">
+            DEMONSTRATION SYSTEM &mdash; all carriers, rates and premiums are fictional
+        </div>
+
+        <div class="legacy-header">
+            <div class="legacy-header-inner">
+                <span class="legacy-logo">PolicyFlow</span>
+                <span class="legacy-logo-sub">AGENT PORTAL &mdash; LEGACY</span>
+                <span class="legacy-build">
+                    v2.4.1 &middot; ASP.NET Web Forms &middot; .NET Framework 4.8
+                </span>
+            </div>
+        </div>
+
+        <div class="legacy-nav">
+            <asp:HyperLink ID="lnkHome" runat="server" NavigateUrl="~/Default.aspx" Text="Home" />
+            <asp:HyperLink ID="lnkQuoteEntry" runat="server" NavigateUrl="~/QuoteEntry.aspx" Text="Quote Entry" />
+            <asp:HyperLink ID="lnkQuoteStatus" runat="server" NavigateUrl="~/QuoteStatus.aspx" Text="Quote Status" />
+        </div>
+
+        <div class="legacy-content">
+            <asp:ContentPlaceHolder ID="MainContent" runat="server" />
+        </div>
+
+        <div class="legacy-footer">
+            <p>
+                PolicyFlow Agent Portal &mdash; legacy channel. Business logic is served by
+                the modern PolicyFlow API through its compatibility endpoints; this
+                application holds no rating or eligibility rules of its own.
+            </p>
+            <p>
+                API base address:
+                <span class="legacy-value-mono"><asp:Literal ID="litApiBase" runat="server" /></span>
+            </p>
+        </div>
+
+    </form>
+</body>
+</html>
