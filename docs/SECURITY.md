@@ -104,7 +104,7 @@ they are already the ones Entra ID would drive.
 
 ## Authorization
 
-Six policies, named by constant so a typo is a compile error rather than a silent
+Seven policies, named by constant so a typo is a compile error rather than a silent
 runtime fail-closed:
 
 | Policy | Roles | Guards |
@@ -115,8 +115,17 @@ runtime fail-closed:
 | `policies:read` | Agent, Underwriter | `GET /api/policies/{id}` |
 | `payments:write` | **Agent only** | `POST /api/policies/{id}/payments` |
 | `legacy:integrate` | LegacySystem | `/legacy/*` |
+| `referrals:review` | **Underwriter only** | `/api/underwriting/*` |
 
 Design decisions worth defending:
+
+**Underwriting review is its own policy, and underwriter-only.** The queue lists
+every referred applicant, which `quotes:read` (one quote by id) does not, and an
+agent must not be able to approve the referral they are trying to bind. The
+decision-maker recorded on the quote comes from the token's `name` claim, never
+from the request body; with authentication relaxed it is recorded as
+`demo-underwriter (unauthenticated)` so demo data cannot pass for a real audit
+trail.
 
 **Binding is agent-only.** A self-service customer token must not be able to
 create a financial obligation.

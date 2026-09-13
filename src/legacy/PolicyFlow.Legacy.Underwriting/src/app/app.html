@@ -1,0 +1,74 @@
+<div class="uw-workbench">
+  <header class="uw-bar">
+    <div>
+      <h1 class="uw-bar__title">Underwriting workbench</h1>
+      <p class="uw-bar__sub">Referred applications awaiting a licensed underwriter's decision.</p>
+    </div>
+
+    @if (store.queue(); as queue) {
+      <dl class="uw-stats">
+        <div>
+          <dt>Referrals</dt>
+          <dd>{{ queue.referralCount }}</dd>
+        </div>
+        <div>
+          <dt>Follow-up</dt>
+          <dd>{{ queue.followUpCount }}</dd>
+        </div>
+      </dl>
+    }
+  </header>
+
+  <!-- Always rendered, so screen readers announce the outcome when it appears. -->
+  <div class="uw-live" role="status" aria-live="polite">
+    @if (store.lastOutcome(); as outcome) {
+      <div class="uw-alert uw-alert--success uw-outcome-banner">
+        <span>{{ outcome.message }}</span>
+        <button type="button" class="uw-link" (click)="store.dismissOutcome()">Dismiss</button>
+      </div>
+    }
+  </div>
+
+  @if (store.queueError(); as problem) {
+    <div class="uw-alert uw-alert--error" role="alert">
+      <strong>{{ problem.title }}.</strong> {{ problem.detail }}
+    </div>
+  }
+
+  @if (store.queue()?.isTruncated) {
+    <div class="uw-alert uw-alert--info">
+      Showing the oldest quotes only. Clear them to see the rest of the queue.
+    </div>
+  }
+
+  <div class="uw-layout">
+    <uw-work-queue
+      class="uw-layout__queue"
+      [items]="store.items()"
+      [selectedQuoteId]="store.selectedQuoteId()"
+      [loading]="store.queueLoading()"
+      [now]="now()"
+      (quoteSelected)="onSelect($event)"
+      (refreshRequested)="onRefresh()"
+    />
+
+    <div class="uw-layout__review">
+      @if (store.reviewLoading()) {
+        <div class="uw-placeholder">Loading quote…</div>
+      } @else if (store.reviewError(); as problem) {
+        <div class="uw-alert uw-alert--error" role="alert">
+          <strong>{{ problem.title }}.</strong> {{ problem.detail }}
+        </div>
+      } @else if (store.review(); as review) {
+        <uw-quote-review
+          [review]="review"
+          [submitting]="store.submitting()"
+          [error]="store.decisionError()"
+          (decided)="onDecide($event)"
+        />
+      } @else {
+        <div class="uw-placeholder">Select a quote from the work queue to review the application.</div>
+      }
+    </div>
+  </div>
+</div>

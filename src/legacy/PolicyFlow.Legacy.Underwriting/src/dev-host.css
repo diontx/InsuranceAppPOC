@@ -1,0 +1,10 @@
+/*
+ * DEVELOPMENT HOST ONLY: the portal's real stylesheet, so `ng serve` renders the
+ * module inside the same chrome as Underwriting.aspx. Included only by the
+ * development build configuration. In the portal, Site.master already loads
+ * legacy.css, and bundling it a second time would override the page's own copy.
+ *
+ * Imported rather than copied as an asset: Angular refuses asset paths outside the
+ * workspace, and a copied file would drift from the one the portal ships.
+ */
+@import '../../PolicyFlow.Legacy.WebForms/Styles/legacy.css';

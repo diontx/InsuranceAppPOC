@@ -1,0 +1,308 @@
+/*
+ * Shared styles for the Angular underwriting module.
+ *
+ * EVERY rule is scoped under the <uw-workbench> host element. This stylesheet is
+ * loaded into a Web Forms page that already carries legacy.css; an unscoped
+ * `button {}` or `input {}` here would restyle every postback control in the
+ * portal. Component-specific layout lives in each component's own stylesheet,
+ * which Angular scopes automatically.
+ *
+ * The palette and type are the legacy portal's, so the module reads as part of
+ * the same application. The difference an agent notices is the interaction, not
+ * the branding.
+ */
+
+uw-workbench {
+  --uw-navy: #0d2240;
+  --uw-blue: #1f3c88;
+  --uw-red: #a81f2e;
+  --uw-ink: #1b2027;
+  --uw-muted: #5b6776;
+  --uw-line: #c6cfda;
+  --uw-surface: #ffffff;
+  --uw-success-bg: #e3f3eb;
+  --uw-success: #1c6b4a;
+  --uw-warning-bg: #fdf0d5;
+  --uw-warning: #8a5a00;
+  --uw-danger-bg: #fbe7e7;
+  --uw-danger: #8c1d2c;
+  --uw-info-bg: #e7eff9;
+  --uw-info: #1f3c88;
+
+  display: block;
+  color: var(--uw-ink);
+  font-family: Tahoma, Verdana, 'Segoe UI', sans-serif;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+uw-workbench *,
+uw-workbench *::before,
+uw-workbench *::after {
+  box-sizing: border-box;
+}
+
+uw-workbench h1,
+uw-workbench h2 {
+  margin: 0;
+}
+
+/* --- Panels ------------------------------------------------------------- */
+
+uw-workbench .uw-panel {
+  border: 1px solid #9aa7b6;
+  background: var(--uw-surface);
+}
+
+uw-workbench .uw-panel__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--uw-navy);
+  background: var(--uw-blue);
+  color: #ffffff;
+}
+
+uw-workbench .uw-panel__header h2 {
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+
+/* --- Fields ------------------------------------------------------------- */
+
+uw-workbench .uw-fieldset {
+  margin: 0;
+  padding: 8px 10px 10px;
+  border: 1px solid var(--uw-line);
+}
+
+uw-workbench .uw-fieldset > legend {
+  padding: 0 4px;
+  color: var(--uw-navy);
+  font-weight: bold;
+}
+
+uw-workbench .uw-field {
+  display: grid;
+  gap: 2px;
+}
+
+uw-workbench .uw-field label {
+  color: #37414d;
+  font-weight: bold;
+}
+
+uw-workbench .uw-input {
+  width: 100%;
+  padding: 4px 5px;
+  border: 1px solid #6b7888;
+  background: #ffffff;
+  color: var(--uw-ink);
+  font: inherit;
+}
+
+uw-workbench .uw-input[readonly] {
+  border-color: var(--uw-line);
+  background: #f3f5f8;
+}
+
+uw-workbench .uw-input:focus-visible {
+  outline: 2px solid var(--uw-blue);
+  outline-offset: -1px;
+}
+
+uw-workbench .uw-input[aria-invalid='true'] {
+  border-color: var(--uw-danger);
+}
+
+uw-workbench .uw-field-error {
+  margin: 2px 0 0;
+  color: var(--uw-danger);
+  font-weight: bold;
+}
+
+/* --- Buttons ------------------------------------------------------------ */
+
+uw-workbench .uw-button {
+  padding: 5px 14px;
+  border: 1px solid #6b7888;
+  background: #eef2f6;
+  color: #37414d;
+  font: inherit;
+  font-size: 11px;
+  font-weight: bold;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+}
+
+uw-workbench .uw-button:hover:not([disabled]) {
+  background: #dfe5ec;
+}
+
+uw-workbench .uw-button[disabled] {
+  cursor: default;
+  opacity: 0.55;
+}
+
+uw-workbench .uw-button--small {
+  padding: 2px 8px;
+  border-color: #c2d8ec;
+  background: transparent;
+  color: #ffffff;
+}
+
+uw-workbench .uw-button--small:hover:not([disabled]) {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+uw-workbench .uw-button--primary {
+  border-color: var(--uw-navy);
+  background: var(--uw-blue);
+  color: #ffffff;
+}
+
+uw-workbench .uw-button--primary:hover:not([disabled]) {
+  background: #1a4478;
+}
+
+uw-workbench .uw-button--danger,
+uw-workbench .uw-button--danger:hover:not([disabled]) {
+  border-color: #6d1520;
+  background: var(--uw-red);
+}
+
+uw-workbench .uw-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+uw-workbench .uw-segmented {
+  display: inline-flex;
+  border: 1px solid #6b7888;
+}
+
+uw-workbench .uw-segmented button {
+  padding: 3px 8px;
+  border: 0;
+  border-right: 1px solid #6b7888;
+  background: #ffffff;
+  color: #37414d;
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+uw-workbench .uw-segmented button:last-child {
+  border-right: 0;
+}
+
+uw-workbench .uw-segmented button.is-active {
+  background: var(--uw-navy);
+  color: #ffffff;
+}
+
+uw-workbench .uw-count {
+  opacity: 0.75;
+}
+
+/* --- Status and alerts -------------------------------------------------- */
+
+uw-workbench .uw-pill {
+  display: inline-block;
+  padding: 1px 7px;
+  border-radius: 9px;
+  font-size: 10px;
+  font-weight: bold;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+uw-workbench .uw-pill--referral {
+  background: var(--uw-warning-bg);
+  color: var(--uw-warning);
+}
+
+uw-workbench .uw-pill--followup,
+uw-workbench .uw-pill--pending,
+uw-workbench .uw-pill--processing {
+  background: var(--uw-info-bg);
+  color: var(--uw-info);
+}
+
+uw-workbench .uw-pill--rated {
+  background: var(--uw-success-bg);
+  color: var(--uw-success);
+}
+
+uw-workbench .uw-pill--declined {
+  background: var(--uw-danger-bg);
+  color: var(--uw-danger);
+}
+
+uw-workbench .uw-alert {
+  margin: 8px 0 0;
+  padding: 8px 10px;
+  border: 1px solid;
+  border-left-width: 4px;
+}
+
+uw-workbench .uw-alert--success {
+  border-color: var(--uw-success);
+  background: var(--uw-success-bg);
+  color: #134a33;
+}
+
+uw-workbench .uw-alert--warning {
+  border-color: var(--uw-warning);
+  background: var(--uw-warning-bg);
+  color: #5e3e00;
+}
+
+uw-workbench .uw-alert--error {
+  border-color: var(--uw-danger);
+  background: var(--uw-danger-bg);
+  color: var(--uw-danger);
+}
+
+uw-workbench .uw-alert--info {
+  border-color: var(--uw-info);
+  background: var(--uw-info-bg);
+  color: var(--uw-navy);
+}
+
+uw-workbench .uw-alert__ref {
+  display: block;
+  margin-top: 4px;
+  font-size: 11px;
+}
+
+/* --- Utilities ---------------------------------------------------------- */
+
+uw-workbench .uw-mono {
+  font-family: Consolas, 'Courier New', monospace;
+}
+
+uw-workbench .uw-empty {
+  margin: 0;
+  padding: 24px 12px;
+  color: var(--uw-muted);
+  text-align: center;
+}
+
+uw-workbench .uw-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}

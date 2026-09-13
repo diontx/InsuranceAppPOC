@@ -161,6 +161,87 @@ having left.
 
 ---
 
+## New screens in the legacy shell: the Angular underwriting module
+
+Underwriters needed a work queue for referred quotes. The portal is where
+internal users already work, so that is where it belongs — but it is **not**
+another Web Forms page. `Underwriting.aspx` hosts an Angular 22 application
+(`src/legacy/PolicyFlow.Legacy.Underwriting`) that owns everything inside a single
+`<uw-workbench>` element and talks to the modern API directly.
+
+```mermaid
+flowchart LR
+    Master["Site.master<br/>(header, nav, server form)"] --> Page["Underwriting.aspx<br/>(host page, ~40 lines)"]
+    Page --> Module["&lt;uw-workbench&gt;<br/>Angular module"]
+    Module -->|"GET/POST /api/underwriting"| Api["REST API"]
+    Api --> Handlers["ReviewReferralHandler<br/>CarrierMarketplace"]
+    Handlers --> Domain["Quote.ApproveReferral<br/>RequestFollowUp · DeclineReferral"]
+
+    style Page fill:#fdf0d5,stroke:#8a5a00
+    style Module fill:#e7eff9,stroke:#1f3c88
+    style Domain fill:#dff3e9,stroke:#1c6b4a
+```
+
+### Why this shape
+
+**New code should not be written against the thing being retired.** A Web Forms
+page would have to be rewritten when the shell goes. An Angular module against
+`/api` moves to any future host unchanged — its only dependency on Web Forms is
+the element it is mounted in.
+
+**It is the strangler pattern applied to the UI, not just the backend.** The seam
+(`/legacy/quotes`) lets *old* pages keep working. This is the other half: *new*
+pages arrive already modern, inside the old shell, so agents get them without a
+second application or a second login.
+
+**It never uses the legacy seam.** The compatibility endpoints exist for code that
+cannot change. New code can, so it uses the modern contract.
+
+**Master-detail is what UpdatePanel does worst.** Clicking a queue row to re-render
+one panel is a full postback with ViewState in Web Forms (compare
+`QuoteStatus.aspx`). Here it is one fetch and one component update.
+
+**It is testable without IIS.** 67 Vitest specs run on any OS, including the
+Linux CI agents that cannot build the Web Forms project at all.
+
+### The decisions stay in the domain
+
+Approve, follow-up and decline are transitions on the `Quote` aggregate
+(`ApproveReferral`, `RequestFollowUp`, `DeclineReferral`), legal only from
+`Referral` or `FollowUp`, and each records who decided and when. Approval re-uses
+the carrier fan-out through `CarrierMarketplace`, extracted from
+`UnderwriteQuoteHandler` for exactly this reason — a second copy would be the
+"same rule twice" failure this document opens with. A test asserts an approved
+referral prices exactly as `CarrierRatingService` would.
+
+The module shows the eligibility trace and carrier appetite, but computes neither:
+both come from the API, produced by the same domain services the worker uses. The
+only rule duplicated in the browser is note length, to save a round trip.
+
+### What hosting inside Web Forms actually requires
+
+| Concern | How it is handled |
+|---|---|
+| API address per environment | `Underwriting.aspx` renders the existing `PolicyFlow.ApiBaseAddress` appSetting into `data-api-base`; one `Web.config` value points both the code-behind and the module at the same API |
+| The master page's single `<form runat="server">` | Enter in any text input would submit it and post the page back. The module suppresses implicit submission on its own inputs, with a spec. Angular's own `<form>` is created through the DOM inside the server form, which works (nested forms cannot be written in markup) |
+| CSS collision with `legacy.css` | Every global rule is scoped under `uw-workbench`; component styles are encapsulated |
+| ASP.NET AJAX on the same page | The module runs zoneless, so zone.js is not patching Microsoft's timers and events |
+| Browser cache after a deploy | Fixed bundle names (`outputHashing: none`) so the page can reference them; the page appends the file timestamp as a cache key |
+| Cross-origin calls | The portal (IIS Express, `https://localhost:44390`) and the API are different origins, so the API's CORS allowlist includes it. The Angular dev server proxies `/api` instead |
+| Bundle not built | The page says so and how to build it, rather than rendering an empty element |
+
+### Build and run
+
+```bash
+cd src/legacy/PolicyFlow.Legacy.Underwriting
+npm ci
+npm run test:ci    # 67 specs
+npm run build      # → PolicyFlow.Legacy.WebForms/Scripts/underwriting/
+npm start          # or: dev server on http://localhost:4200 inside a copy of the portal chrome
+```
+
+---
+
 ## Why not just rewrite it?
 
 Three reasons this POC models extraction rather than replacement.
@@ -252,9 +333,10 @@ architecture is how a "transitional" layer survives a decade.
 | Bind a policy | ❌ | ✅ |
 | Take a payment | ❌ | ✅ |
 | Mobile-usable | ⚠️ minimal reflow only | ✅ mobile-first |
-| Business logic held locally | ❌ **none** | ❌ **none** |
+| Underwriter work queue | ✅ Angular module in `Underwriting.aspx`, against `/api` | — internal tool; applicants see the follow-up request |
+| Business logic held locally | ❌ **none** (Web Forms or Angular) | ❌ **none** |
 
-The last row is the one that matters. Neither UI owns a business rule.
+The last row is the one that matters. No UI owns a business rule.
 
 The gaps are not defects to fix — they are the **case for retirement**. Extending
 the legacy portal to show fifteen offers would mean a schema change, a ViewState
@@ -316,6 +398,19 @@ This caught a real defect that `msbuild` alone did not: the project template's
 `<add namespace="System.Web.Optimization" />` in `Web.config` references a type
 from a NuGet package this project does not have, failing with `CS0234` at
 precompile time only. If you add to `Web.config`, run the precompiler.
+
+### A runtime trap no build catches
+
+**Validators and `targetFramework="4.8"`.** With `httpRuntime targetFramework` 4.5
+or later, `asp:RequiredFieldValidator` and friends default to
+`UnobtrusiveValidationMode="WebForms"`, which throws unless a ScriptManager
+`ScriptResourceMapping` named `jquery` is registered. This project has no jQuery,
+so `QuoteEntry.aspx` and `QuoteStatus.aspx` threw on first render — and
+`customErrors` turned the exception into a quiet redirect to the home page. Both
+`msbuild` and `aspnet_compiler` passed. It surfaced only when the portal was
+actually run under IIS Express. `Web.config` now sets
+`ValidationSettings:UnobtrusiveValidationMode` to `None`. Precompiling proves the
+markup; only running a page proves it renders.
 
 ### Two build traps worth knowing
 

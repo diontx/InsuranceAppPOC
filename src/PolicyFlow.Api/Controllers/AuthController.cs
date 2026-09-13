@@ -158,7 +158,8 @@ public sealed class AuthController(
         PolicyFlowRoles.Underwriter =>
         [
             PolicyFlowPolicies.ReadQuotes,
-            PolicyFlowPolicies.ReadPolicies
+            PolicyFlowPolicies.ReadPolicies,
+            PolicyFlowPolicies.ReviewReferrals
         ],
 
         PolicyFlowRoles.LegacySystem =>

@@ -137,7 +137,11 @@ services:
       JWT_TOKEN_LIFETIME_MINUTES: ${JWT_TOKEN_LIFETIME_MINUTES:-60}
       ENABLE_DEV_TOKEN_ENDPOINT: ${ENABLE_DEV_TOKEN_ENDPOINT:-true}
       REQUIRE_AUTHENTICATION: ${REQUIRE_AUTHENTICATION:-false}
-      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:8080,http://localhost:5173}
+      # The legacy portal under IIS Express, where Underwriting.aspx's Angular
+      # module calls the API cross-origin: https://localhost:44390 from Visual
+      # Studio, http://localhost:8095 from the command line (README). The Angular
+      # dev server (4200) proxies /api instead, so it needs no entry.
+      CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:8080,http://localhost:5173,https://localhost:44390,http://localhost:8095}
       RATE_LIMIT_PERMIT_PER_MINUTE: ${RATE_LIMIT_PERMIT_PER_MINUTE:-120}
       RATE_LIMIT_QUEUE_LIMIT: ${RATE_LIMIT_QUEUE_LIMIT:-10}
 

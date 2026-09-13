@@ -19,5 +19,8 @@ namespace PolicyFlow.Legacy.WebForms
 
         /// <summary>lnkStatusInquiry control.</summary>
         protected global::System.Web.UI.WebControls.HyperLink lnkStatusInquiry;
+
+        /// <summary>lnkUnderwritingQueue control.</summary>
+        protected global::System.Web.UI.WebControls.HyperLink lnkUnderwritingQueue;
     }
 }

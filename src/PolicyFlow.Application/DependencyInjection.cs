@@ -5,6 +5,7 @@ using PolicyFlow.Application.Carriers;
 using PolicyFlow.Application.Payments;
 using PolicyFlow.Application.Policies;
 using PolicyFlow.Application.Quotes;
+using PolicyFlow.Application.Underwriting;
 using PolicyFlow.Domain.Common;
 using PolicyFlow.Domain.Rating;
 
@@ -29,11 +30,15 @@ public static class DependencyInjection
         services.AddScoped<SubmitQuoteHandler>();
         services.AddScoped<GetQuoteHandler>();
         services.AddScoped<GetQuoteOffersHandler>();
+        services.AddScoped<CarrierMarketplace>();
         services.AddScoped<UnderwriteQuoteHandler>();
         services.AddScoped<CreatePolicyFromQuoteHandler>();
         services.AddScoped<GetPolicyHandler>();
         services.AddScoped<SubmitPaymentHandler>();
         services.AddScoped<LegacyQuoteAdapter>();
+        services.AddScoped<GetUnderwritingQueueHandler>();
+        services.AddScoped<GetUnderwritingReviewHandler>();
+        services.AddScoped<ReviewReferralHandler>();
 
         // --- Simulated external dependencies.
         //     Each is documented as POC-only in its own implementation file.
@@ -43,6 +48,7 @@ public static class DependencyInjection
 
         // --- Validators.
         services.AddScoped<IValidator<SubmitQuoteCommand>, SubmitQuoteCommandValidator>();
+        services.AddScoped<IValidator<ReviewReferralCommand>, ReviewReferralCommandValidator>();
 
         return services;
     }

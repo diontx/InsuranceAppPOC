@@ -26,6 +26,9 @@ namespace PolicyFlow.Legacy.WebForms
         /// <summary>lnkQuoteStatus control.</summary>
         protected global::System.Web.UI.WebControls.HyperLink lnkQuoteStatus;
 
+        /// <summary>lnkUnderwriting control.</summary>
+        protected global::System.Web.UI.WebControls.HyperLink lnkUnderwriting;
+
         /// <summary>MainContent placeholder.</summary>
         protected global::System.Web.UI.WebControls.ContentPlaceHolder MainContent;
 

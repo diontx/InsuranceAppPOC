@@ -37,6 +37,10 @@ variables:
   NODE_VERSION: '20.x'
   BUILD_CONFIGURATION: 'Release'
   WEB_PROJECT: 'src/PolicyFlow.Web'
+  # The Angular underwriting module hosted by the legacy portal. Angular 22 has
+  # a higher Node floor than the React build, hence its own version.
+  UNDERWRITING_PROJECT: 'src/legacy/PolicyFlow.Legacy.Underwriting'
+  UNDERWRITING_NODE_VERSION: '24.x'
 
   # Telemetry off and no first-run experience: both add latency to every agent
   # job for no benefit in CI.
@@ -249,6 +253,49 @@ stages:
           - publish: '$(WEB_PROJECT)/dist'
             artifact: web
             displayName: 'Stage SPA artifact'
+
+      # The Angular module that Underwriting.aspx hosts. The Web Forms project
+      # itself cannot build on this Linux agent, but the module can — so the new
+      # screen in the legacy portal is tested on every commit even though the
+      # portal around it is not.
+      - job: UnderwritingModule
+        displayName: 'Angular underwriting module: test, build'
+        timeoutInMinutes: 15
+
+        steps:
+          - checkout: self
+            fetchDepth: 1
+
+          - task: NodeTool@0
+            displayName: 'Install Node $(UNDERWRITING_NODE_VERSION)'
+            inputs:
+              versionSpec: '$(UNDERWRITING_NODE_VERSION)'
+
+          - task: Cache@2
+            displayName: 'Restore npm cache'
+            inputs:
+              key: 'npm | "$(Agent.OS)" | $(UNDERWRITING_PROJECT)/package-lock.json'
+              restoreKeys: |
+                npm | "$(Agent.OS)"
+              path: '$(Pipeline.Workspace)/.npm'
+
+          - script: npm ci --cache $(Pipeline.Workspace)/.npm --prefer-offline
+            displayName: 'npm ci'
+            workingDirectory: '$(UNDERWRITING_PROJECT)'
+
+          - script: npm run test:ci
+            displayName: 'npm run test:ci'
+            workingDirectory: '$(UNDERWRITING_PROJECT)'
+
+          # Production build, including AOT template type-checking. Writes into
+          # the Web Forms project's Scripts/underwriting folder.
+          - script: npm run build
+            displayName: 'npm run build'
+            workingDirectory: '$(UNDERWRITING_PROJECT)'
+
+          - publish: 'src/legacy/PolicyFlow.Legacy.WebForms/Scripts/underwriting'
+            artifact: underwriting-module
+            displayName: 'Stage underwriting module artifact'
 
   # ===========================================================================
   # Stage 3 — Container validation

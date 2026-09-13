@@ -460,7 +460,8 @@
   color: var(--success-700);
 }
 
-.pill--referral {
+.pill--referral,
+.pill--followup {
   background: var(--warning-100);
   color: var(--warning-700);
 }

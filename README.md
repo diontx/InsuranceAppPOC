@@ -140,6 +140,7 @@ is committed anywhere in this repository.
 |---|---|
 | http://localhost:8080 | **React SPA** — start here |
 | http://localhost:8080/lookup | Mobile quote lookup |
+| http://localhost:4200 | **Underwriter work queue** — the Angular module from the legacy portal (`npm start` in `src/legacy/PolicyFlow.Legacy.Underwriting`) |
 | http://localhost:8081/swagger | OpenAPI (Development only) |
 | http://localhost:8081/health/ready | Readiness with per-dependency detail |
 | http://localhost:8081/api/carriers | The carrier panel |
@@ -167,6 +168,25 @@ is committed anywhere in this repository.
 
 **Resize to phone width**, or open on a real phone at
 `http://<your-ip>:8080/lookup`, and look up the quote by number + surname.
+
+### The underwriter's side (Angular, in the legacy portal)
+
+Referred quotes land in an underwriter work queue — an Angular module hosted by
+the legacy portal's `Underwriting.aspx`. To run it without IIS:
+
+```bash
+cd src/legacy/PolicyFlow.Legacy.Underwriting
+npm ci
+npm start                     # http://localhost:4200, proxies /api to :8081
+```
+
+1. Submit a quote with **prior insurance 0 months** so it is referred.
+2. Open **http://localhost:4200** and select it in the queue.
+3. The review form shows the application read-only, the rule that referred it,
+   and which carriers would price it on approval.
+4. **Approve** — the carrier panel prices it and the quote becomes Rated; look it
+   up at `/lookup` in the SPA and it can now be bought. **Request follow-up** keeps
+   it in the queue and shows the applicant your note. **Decline** closes it.
 
 ### From the command line
 
@@ -243,8 +263,8 @@ dotnet build
 Domain and application tests need nothing running:
 
 ```bash
-dotnet test tests/PolicyFlow.Domain.Tests        # 130 tests, ~150ms
-dotnet test tests/PolicyFlow.Application.Tests   # 90 tests
+dotnet test tests/PolicyFlow.Domain.Tests        # 161 tests, ~150ms
+dotnet test tests/PolicyFlow.Application.Tests   # 119 tests
 ```
 
 **Integration tests require real SQL Server** — that is the point of them. The
@@ -261,13 +281,13 @@ export MSSQL_SA_PASSWORD=$(grep '^MSSQL_SA_PASSWORD=' .env | cut -d= -f2-)
 # PowerShell
 $env:MSSQL_SA_PASSWORD = (Get-Content .env | Select-String '^MSSQL_SA_PASSWORD=').ToString().Split('=',2)[1]
 
-dotnet test tests/PolicyFlow.Api.IntegrationTests   # 71 tests
+dotnet test tests/PolicyFlow.Api.IntegrationTests   # 86 tests
 ```
 
 Each run creates and drops its own database, so runs never interfere.
 
 ```bash
-dotnet test    # all 291
+dotnet test    # all 366
 ```
 
 ### Frontend
@@ -280,14 +300,24 @@ npm run test:ci     # 41 tests with coverage
 npm run build
 ```
 
+The Angular underwriting module (legacy portal):
+
+```bash
+cd src/legacy/PolicyFlow.Legacy.Underwriting
+npm ci
+npm run test:ci     # 67 tests
+npm run build       # into PolicyFlow.Legacy.WebForms/Scripts/underwriting
+```
+
 ### What the tests actually prove
 
 | Suite | Count | Notable |
 |---|---|---|
-| `PolicyFlow.Domain.Tests` | 130 | Every rating rule and boundary; every state transition; culture-independent trace rendering |
-| `PolicyFlow.Application.Tests` | 90 | Redelivery is a no-op; legacy and modern channels rate identically; read-model failure is non-fatal |
-| `PolicyFlow.Api.IntegrationTests` | 71 | **20 concurrent payments → 1 row**; 10 concurrent binds → 1 policy; no stack traces leak |
+| `PolicyFlow.Domain.Tests` | 161 | Every rating rule and boundary; every state transition, including underwriter decisions; culture-independent trace rendering |
+| `PolicyFlow.Application.Tests` | 119 | Redelivery is a no-op; legacy and modern channels rate identically; an approved referral prices exactly as the rating service does |
+| `PolicyFlow.Api.IntegrationTests` | 86 | **20 concurrent payments → 1 row**; 10 concurrent binds → 1 policy; **5 concurrent underwriter decisions → 1 recorded**; no stack traces leak |
 | `PolicyFlow.Web` (Vitest) | 41 | Retry reuses the idempotency key; polling stops at a terminal state |
+| `PolicyFlow.Legacy.Underwriting` (Vitest) | 67 | A slow response cannot show the wrong quote; a 409 reloads what changed; Enter cannot post back the Web Forms page |
 
 ---
 
@@ -381,14 +411,33 @@ development* workload (`Microsoft.WebApplication.targets`). The project emits a
 clear warning if it is absent rather than failing; compiling and precompiling
 work without it.
 
-Then run it under IIS Express against a running API by editing `Web.config`:
+Then run it under IIS Express against a running API. `Web.config` already points
+at the Docker API:
 
 ```xml
 <add key="PolicyFlow.ApiBaseAddress" value="http://localhost:8081" />
 ```
 
+From Visual Studio press F5 (`https://localhost:44390`), or from a terminal:
+
+```powershell
+cd src/legacy/PolicyFlow.Legacy.Underwriting; npm ci; npm run build; cd ../../..
+& "$env:ProgramFiles\IIS Express\iisexpress.exe" /path:"$PWD\src\legacy\PolicyFlow.Legacy.WebForms" /port:8095 /clr:v4.0
+# http://localhost:8095/Underwriting.aspx
+```
+
+Both origins must be in the API's `CORS_ALLOWED_ORIGINS` (the defaults include
+them); a `.env` created before this was added needs the line updated.
+
 Both channels write to the same SQL Server, so a quote submitted in the legacy
 portal appears in the React SPA and vice versa.
+
+**`Underwriting.aspx` hosts an Angular module** rather than being another Web
+Forms page: the underwriter work queue in `src/legacy/PolicyFlow.Legacy.Underwriting`.
+Build it with `npm run build` there before running the portal (the page says so if
+you forget). It calls `/api/underwriting` directly, cross-origin from IIS Express,
+which is why `CORS_ALLOWED_ORIGINS` includes `https://localhost:44390`. It also
+runs standalone on the Angular dev server — see *The underwriter's side* above.
 
 **`docs/LEGACY-MODERNIZATION.md`** explains the seam, the page lifecycle,
 ViewState costs, and the seven-step migration strategy — and the two tests that
@@ -509,12 +558,13 @@ PolicyFlow/
 │   ├── PolicyFlow.Worker/              # Service Bus consumer, carrier fan-out
 │   ├── PolicyFlow.Web/                 # React SPA
 │   └── legacy/
-│       └── PolicyFlow.Legacy.WebForms/ # .NET Framework 4.8, Windows only
+│       ├── PolicyFlow.Legacy.WebForms/ # .NET Framework 4.8, Windows only
+│       └── PolicyFlow.Legacy.Underwriting/ # Angular 22 module hosted by Underwriting.aspx
 │
 ├── tests/
-│   ├── PolicyFlow.Domain.Tests/        # 130
-│   ├── PolicyFlow.Application.Tests/   # 90
-│   └── PolicyFlow.Api.IntegrationTests/# 71, real SQL Server
+│   ├── PolicyFlow.Domain.Tests/        # 161
+│   ├── PolicyFlow.Application.Tests/   # 119
+│   └── PolicyFlow.Api.IntegrationTests/# 86, real SQL Server
 │
 ├── infra/
 │   ├── servicebus/config.json          # emulator namespace and queue

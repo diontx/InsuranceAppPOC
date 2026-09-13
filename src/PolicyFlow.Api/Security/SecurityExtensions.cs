@@ -182,6 +182,13 @@ public static class SecurityExtensions
             // The legacy application authenticates as a service principal, not as
             // a user, so it gets a dedicated role and policy. That keeps the
             // eventual retirement of the legacy channel a one-line revocation.
+            // Underwriters only. An agent can bind what an underwriter approved, but
+            // must not be able to approve their own referral.
+            options.AddPolicy(PolicyFlowPolicies.ReviewReferrals, policy =>
+                policy.RequireAssertion(context => relaxed ||
+                    HasScope(context.User, PolicyFlowPolicies.ReviewReferrals) ||
+                    context.User.IsInRole(PolicyFlowRoles.Underwriter)));
+
             options.AddPolicy(PolicyFlowPolicies.LegacyIntegration, policy =>
                 policy.RequireAssertion(context => relaxed ||
                     HasScope(context.User, PolicyFlowPolicies.LegacyIntegration) ||

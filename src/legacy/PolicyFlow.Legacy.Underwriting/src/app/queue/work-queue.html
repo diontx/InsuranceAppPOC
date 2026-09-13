@@ -1,0 +1,78 @@
+<section class="uw-panel" aria-labelledby="uw-queue-heading">
+  <header class="uw-panel__header">
+    <h2 id="uw-queue-heading">Work queue</h2>
+    <button
+      type="button"
+      class="uw-button uw-button--small"
+      [disabled]="loading()"
+      (click)="refreshRequested.emit()"
+    >
+      {{ loading() ? 'Refreshing…' : 'Refresh' }}
+    </button>
+  </header>
+
+  <div class="uw-queue__tools">
+    <div class="uw-segmented" role="group" aria-label="Filter by status">
+      @for (option of filters; track option.value) {
+        <button
+          type="button"
+          [class.is-active]="filter() === option.value"
+          [attr.aria-pressed]="filter() === option.value"
+          (click)="filter.set(option.value)"
+        >
+          {{ option.label }} <span class="uw-count">{{ counts()[option.value] }}</span>
+        </button>
+      }
+    </div>
+
+    <label class="uw-visually-hidden" for="uw-queue-search">Search by quote number or applicant</label>
+    <input
+      id="uw-queue-search"
+      type="search"
+      class="uw-input"
+      placeholder="Quote # or applicant"
+      autocomplete="off"
+      [value]="search()"
+      (input)="onSearch($event)"
+      (keydown.enter)="$event.preventDefault()"
+    />
+  </div>
+
+  @if (visibleItems().length === 0) {
+    <p class="uw-empty">
+      @if (items().length > 0) {
+        No quotes match this filter.
+      } @else if (loading()) {
+        Loading the queue…
+      } @else {
+        No quotes are awaiting review.
+      }
+    </p>
+  } @else {
+    <ul class="uw-queue__list">
+      @for (item of visibleItems(); track item.quoteId) {
+        <li>
+          <button
+            type="button"
+            class="uw-queue__item"
+            [class.is-selected]="item.quoteId === selectedQuoteId()"
+            [attr.aria-current]="item.quoteId === selectedQuoteId() ? 'true' : null"
+            [attr.data-quote-number]="item.quoteNumber"
+            (click)="quoteSelected.emit(item.quoteId)"
+          >
+            <span class="uw-queue__row">
+              <span class="uw-mono uw-queue__number">{{ item.quoteNumber }}</span>
+              <uw-status-pill [status]="item.status" />
+            </span>
+            <span class="uw-queue__name">{{ item.customerName }}</span>
+            <span class="uw-queue__meta">{{ item.state }} · {{ item.vehicleDescription }}</span>
+            @if (item.reason) {
+              <span class="uw-queue__reason">{{ item.reason }}</span>
+            }
+            <span class="uw-queue__age">In queue {{ item.submittedUtc | timeInQueue: now() }}</span>
+          </button>
+        </li>
+      }
+    </ul>
+  }
+</section>

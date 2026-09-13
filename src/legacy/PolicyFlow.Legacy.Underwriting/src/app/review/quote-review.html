@@ -1,0 +1,230 @@
+@let r = review();
+
+<article class="uw-panel" aria-labelledby="uw-review-heading">
+  <header class="uw-panel__header">
+    <h2 id="uw-review-heading">
+      Quote <span class="uw-mono">{{ r.quoteNumber }}</span>
+    </h2>
+    <uw-status-pill [status]="r.status" />
+  </header>
+
+  <form class="uw-review" [formGroup]="form" (ngSubmit)="submit()" novalidate>
+    <p class="uw-review__submitted">
+      Submitted {{ r.submittedUtc | utc | date: 'MMM d, y, h:mm a' }} through the
+      {{ r.channel === 'LegacyWebForms' ? 'legacy agent portal' : 'online quote flow' }}.
+    </p>
+
+    <!-- ===== The application, read-only ===== -->
+    <fieldset class="uw-fieldset">
+      <legend>Applicant</legend>
+      <div class="uw-grid">
+        <div class="uw-field uw-field--wide">
+          <label for="uw-applicant">Insured name</label>
+          <input id="uw-applicant" class="uw-input" readonly [value]="r.customerName" />
+        </div>
+        <div class="uw-field">
+          <label for="uw-state">Garaging state</label>
+          <input id="uw-state" class="uw-input" readonly [value]="r.state" />
+        </div>
+      </div>
+    </fieldset>
+
+    <fieldset class="uw-fieldset">
+      <legend>Vehicle</legend>
+      <div class="uw-grid">
+        <div class="uw-field">
+          <label for="uw-vehicle-year">Year</label>
+          <input id="uw-vehicle-year" class="uw-input" readonly [value]="r.vehicleYear" />
+        </div>
+        <div class="uw-field">
+          <label for="uw-vehicle-make">Make</label>
+          <input id="uw-vehicle-make" class="uw-input" readonly [value]="r.vehicleMake" />
+        </div>
+        <div class="uw-field">
+          <label for="uw-vehicle-model">Model</label>
+          <input id="uw-vehicle-model" class="uw-input" readonly [value]="r.vehicleModel" />
+        </div>
+        <div class="uw-field">
+          <label for="uw-mileage">Annual mileage</label>
+          <input id="uw-mileage" class="uw-input" readonly [value]="r.annualMileage | number" />
+        </div>
+      </div>
+    </fieldset>
+
+    <fieldset class="uw-fieldset">
+      <legend>Coverage history and house rules</legend>
+      <div class="uw-grid">
+        <div class="uw-field">
+          <label for="uw-prior">Prior insurance (months)</label>
+          <input id="uw-prior" class="uw-input" readonly [value]="r.priorInsuranceMonths" />
+        </div>
+        <div class="uw-field">
+          <label for="uw-eligibility">Eligibility result</label>
+          <input id="uw-eligibility" class="uw-input" readonly [value]="r.eligibilityOutcome" />
+        </div>
+        <div class="uw-field">
+          <label for="uw-baseline">House baseline premium</label>
+          <input
+            id="uw-baseline"
+            class="uw-input"
+            readonly
+            [value]="r.baselineAnnualPremium === undefined ? 'Not priced' : (r.baselineAnnualPremium | currency: 'USD')"
+          />
+        </div>
+      </div>
+
+      @if (r.decisionReason) {
+        <div class="uw-alert" [class.uw-alert--warning]="r.isAwaitingReview" [class.uw-alert--info]="!r.isAwaitingReview">
+          <strong>{{ r.status === 'FollowUp' ? 'Follow-up requested:' : r.status === 'Declined' ? 'Declined:' : 'Referred:' }}</strong>
+          {{ r.decisionReason }}
+        </div>
+      }
+
+      <details class="uw-trace" open>
+        <summary>Rules applied at submission ({{ r.eligibilityTrace.length }})</summary>
+        <ol>
+          @for (line of r.eligibilityTrace; track $index) {
+            <li class="uw-mono">{{ line }}</li>
+          }
+        </ol>
+      </details>
+    </fieldset>
+
+    <fieldset class="uw-fieldset">
+      <legend>Carrier appetite</legend>
+      <p class="uw-appetite__summary">
+        <strong>{{ willingCarriers().length }} of {{ r.carrierAppetite.length }}</strong> carriers would price this
+        risk if it is approved.
+      </p>
+      <ul class="uw-appetite">
+        @for (carrier of r.carrierAppetite; track carrier.carrierId) {
+          <li [class.is-declined]="!carrier.willWrite">
+            <span class="uw-appetite__mark" aria-hidden="true">{{ carrier.willWrite ? '✓' : '✕' }}</span>
+            <span>
+              <strong>{{ carrier.carrierName }}</strong>
+              <span class="uw-visually-hidden">{{ carrier.willWrite ? ' will write' : ' will not write' }}</span>
+              @if (carrier.reason) {
+                <span class="uw-appetite__reason">{{ carrier.reason }}</span>
+              }
+            </span>
+          </li>
+        }
+      </ul>
+    </fieldset>
+
+    @if (r.reviewedBy) {
+      <fieldset class="uw-fieldset">
+        <legend>Last underwriter action</legend>
+        <p class="uw-last-review">
+          <strong>{{ r.reviewedBy }}</strong>
+          @if (r.reviewedUtc) {
+            on {{ r.reviewedUtc | utc | date: 'MMM d, y, h:mm a' }}
+          }
+          @if (r.reviewNote) {
+            <q>{{ r.reviewNote }}</q>
+          }
+        </p>
+      </fieldset>
+    }
+
+    <!-- ===== Decision ===== -->
+    <!-- Outside the decision block on purpose: after a 409 the quote is reloaded
+         in its decided state and the form disappears, but the underwriter still
+         needs to be told why their decision was not recorded. -->
+    @if (generalError(); as problem) {
+      <div class="uw-alert uw-alert--error" role="alert">
+        <strong>{{ problem.title }}.</strong>
+        @if (problem.detail) {
+          {{ problem.detail }}
+        }
+        @if (problem.correlationId) {
+          <span class="uw-alert__ref">Reference: <span class="uw-mono">{{ problem.correlationId }}</span></span>
+        }
+      </div>
+    }
+
+    @if (r.isAwaitingReview) {
+      <fieldset class="uw-fieldset uw-decision">
+        <legend>Decision</legend>
+
+        <fieldset class="uw-options" [attr.aria-describedby]="decisionMissing() ? 'uw-decision-error' : null">
+          <legend class="uw-visually-hidden">Choose a decision</legend>
+          @for (option of decisionOptions(); track option.value) {
+            <label class="uw-option" [class.is-disabled]="option.disabled" [class.is-chosen]="decision() === option.value">
+              @if (option.disabled) {
+                <!-- Not bound to the form: a reactive control disables the whole
+                     radio group, and only this option is unavailable. -->
+                <input
+                  type="radio"
+                  name="uw-decision-unavailable"
+                  disabled
+                  [id]="'uw-decision-' + option.value"
+                  [value]="option.value"
+                />
+              } @else {
+                <input
+                  type="radio"
+                  formControlName="decision"
+                  [id]="'uw-decision-' + option.value"
+                  [value]="option.value"
+                />
+              }
+              <span>
+                <span class="uw-option__label">{{ option.label }}</span>
+                <span class="uw-option__description">{{ option.description }}</span>
+              </span>
+            </label>
+          }
+        </fieldset>
+        @if (decisionMissing()) {
+          <p id="uw-decision-error" class="uw-field-error" role="alert">Choose a decision.</p>
+        }
+
+        <div class="uw-field uw-field--note">
+          <label for="uw-note">{{ noteLabel() }}</label>
+          <textarea
+            id="uw-note"
+            class="uw-input"
+            rows="4"
+            formControlName="note"
+            [attr.maxlength]="noteMaxLength"
+            [attr.aria-invalid]="noteError() ? 'true' : null"
+            [attr.aria-describedby]="noteError() ? 'uw-note-count uw-note-error' : 'uw-note-count'"
+          ></textarea>
+          <span id="uw-note-count" class="uw-note__count">{{ noteLength() }} / {{ noteMaxLength }}</span>
+          @if (noteError(); as message) {
+            <p id="uw-note-error" class="uw-field-error" role="alert">{{ message }}</p>
+          }
+        </div>
+
+        <div class="uw-actions">
+          <button
+            type="submit"
+            class="uw-button uw-button--primary"
+            [class.uw-button--danger]="decision() === 'Decline'"
+            [disabled]="submitting()"
+          >
+            {{ submitting() ? 'Saving…' : submitLabel() }}
+          </button>
+        </div>
+      </fieldset>
+    } @else {
+      <div class="uw-alert uw-alert--success uw-outcome" role="status">
+        @switch (r.status) {
+          @case ('Rated') {
+            <strong>Approved{{ r.reviewedBy ? ' by ' + r.reviewedBy : '' }}.</strong>
+            {{ r.offerCount }} carrier offers are available to the applicant; best annual premium
+            {{ r.annualPremium | currency: 'USD' }}.
+          }
+          @case ('Declined') {
+            <strong>Declined{{ r.reviewedBy ? ' by ' + r.reviewedBy : '' }}.</strong>
+            This referral is closed.
+          }
+          @default {
+            <strong>No decision is needed.</strong> This quote is {{ r.status }}.
+          }
+        }
+      </div>
+    }
+  </form>
+</article>

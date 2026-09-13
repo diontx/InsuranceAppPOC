@@ -157,9 +157,12 @@ namespace PolicyFlow.Legacy.WebForms.Models
                     return false;
                 }
 
+                // FOLLOWUP: an underwriter has asked the applicant for more
+                // information. Nothing automated will change it, so polling stops.
                 return QuoteStatus == "RATED"
                     || QuoteStatus == "REFERRAL"
-                    || QuoteStatus == "DECLINED";
+                    || QuoteStatus == "DECLINED"
+                    || QuoteStatus == "FOLLOWUP";
             }
         }
 

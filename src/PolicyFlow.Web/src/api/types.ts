@@ -6,13 +6,17 @@
  * layer's view models.
  */
 
-/** Quote lifecycle. `Rated`, `Referral` and `Declined` are terminal. */
+/**
+ * Quote lifecycle. `Rated`, `Referral`, `Declined` and `FollowUp` are terminal.
+ * `FollowUp` means an underwriter has asked the applicant for more information.
+ */
 export type QuoteStatus =
   | 'Pending'
   | 'Processing'
   | 'Rated'
   | 'Referral'
-  | 'Declined';
+  | 'Declined'
+  | 'FollowUp';
 
 /** The three coverage packages every carrier files. */
 export type CoverageTier = 'Basic' | 'Standard' | 'Premium';

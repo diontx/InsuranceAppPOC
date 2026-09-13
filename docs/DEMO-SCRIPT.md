@@ -353,6 +353,59 @@ If there is time, open `src/legacy/PolicyFlow.Legacy.WebForms/QuoteEntry.aspx.cs
 
 ---
 
+## 8a. The underwriter's side — 60 seconds
+
+**Before:** `npm start` in `src/legacy/PolicyFlow.Legacy.Underwriting`, and submit
+a quote with `priorInsuranceMonths: 0` (a legacy one via the curl above works too).
+
+**Browser:** http://localhost:4200
+
+> Referred quotes need a human. This is the underwriter's work queue, and it lives
+> in the legacy portal — that is where internal users already work. But it is not
+> a Web Forms page. It is an Angular module the page hosts, calling the modern
+> API.
+
+Click the referral. Point at, in order:
+
+1. **The read-only application.** "The underwriter decides on what was applied for."
+2. **The rule that referred it.** "Computed by the same `QuoteRatingService` the
+   worker ran. The browser knows no rules."
+3. **Carrier appetite — 3 of 5.** "Before I press Approve I can see who will price
+   it."
+
+Press **Approve**.
+
+> That shopped the carrier panel through the same code the worker uses — I
+> extracted it rather than copy it, and a test asserts an approved referral prices
+> exactly as the rating service does. The quote is Rated; the customer can buy it.
+
+Optionally look it up at http://localhost:8080/lookup to show the offers.
+
+Then a risk no carrier will write (`annualMileage: 95000`):
+
+> Approve is unavailable, and it says why. Approval overrides our house rule, not a
+> carrier's appetite. If I force it through the API, it is a 422.
+
+On why Angular inside Web Forms:
+
+> New code should not be written against the thing being retired. This moves to
+> any host unchanged. It is the strangler pattern for the UI: the seam keeps old
+> pages working, and new pages arrive already modern inside the old shell.
+>
+> Two details that only show up when you actually host it: the master page wraps
+> everything in one server-side form, so Enter in a search box would post the
+> whole page back — prevented, with a test. And it runs zoneless, so it is not
+> patching the ASP.NET AJAX library's timers on the same page.
+
+If asked about concurrency:
+
+> Two underwriters, one quote: the status check gives a clean 409, and the
+> `rowversion` guarantees it — an integration test fires five simultaneous
+> decisions and exactly one is recorded. The UI then reloads the quote so the
+> second underwriter sees what happened.
+
+---
+
 ## 9. Tests and CI — 45 seconds
 
 ```bash

@@ -1,7 +1,6 @@
 using System.Diagnostics;
 using Microsoft.Extensions.Logging;
 using PolicyFlow.Application.Abstractions;
-using PolicyFlow.Domain.Carriers;
 using PolicyFlow.Domain.Common;
 using PolicyFlow.Domain.Quotes;
 using PolicyFlow.Domain.Rating;
@@ -29,13 +28,15 @@ namespace PolicyFlow.Application.Quotes;
 /// The handler is safe to run twice. Step 1 short-circuits, and the worker's
 /// <c>ProcessedMessage</c> ledger prevents the common case from reaching here.
 /// </para>
+/// <para>
+/// The fan-out and read-model write live in <see cref="CarrierMarketplace"/>,
+/// shared with underwriter approval so the panel is shopped by one implementation.
+/// </para>
 /// </remarks>
 public sealed class UnderwriteQuoteHandler(
     IQuoteRepository quotes,
     IUnitOfWork unitOfWork,
-    ICarrierCatalog catalog,
-    ICarrierRatingGateway carrierGateway,
-    IQuoteComparisonStore comparisonStore,
+    CarrierMarketplace marketplace,
     IPriorInsuranceVerifier verifier,
     QuoteRatingService ratingService,
     IClock clock,
@@ -94,7 +95,8 @@ public sealed class UnderwriteQuoteHandler(
         {
             quote.MarkReferral(decision.Reason!, clock.UtcNow);
             await unitOfWork.SaveChangesAsync(ct);
-            await WriteComparisonDocumentAsync(quote, decision, [], [], overall, ct);
+            await marketplace.WriteComparisonDocumentAsync(
+                quote, decision.BaselineAnnualPremium, [], [], overall.ElapsedMilliseconds, ct);
 
             logger.LogInformation(
                 "Quote referred. Operation={Operation} QuoteId={QuoteId} QuoteNumber={QuoteNumber} " +
@@ -108,7 +110,8 @@ public sealed class UnderwriteQuoteHandler(
         {
             quote.MarkDecline(decision.Reason!, clock.UtcNow);
             await unitOfWork.SaveChangesAsync(ct);
-            await WriteComparisonDocumentAsync(quote, decision, [], [], overall, ct);
+            await marketplace.WriteComparisonDocumentAsync(
+                quote, decision.BaselineAnnualPremium, [], [], overall.ElapsedMilliseconds, ct);
 
             logger.LogInformation(
                 "Quote declined. Operation={Operation} QuoteId={QuoteId} QuoteNumber={QuoteNumber} " +
@@ -119,59 +122,32 @@ public sealed class UnderwriteQuoteHandler(
         }
 
         // --- Carrier marketplace fan-out.
-        var carriers = await catalog.GetActiveCarriersAsync(ct);
-        var fanOut = Stopwatch.StartNew();
-
-        // Concurrent, not sequential: five carriers averaging 400ms each would take
-        // two seconds in series. Each gateway isolates its own failure, so one slow
-        // or broken carrier cannot take down the panel.
-        var carrierResults = await Task.WhenAll(
-            carriers.Select(carrier => carrierGateway.RequestOffersAsync(quote, carrier, ct)));
-
-        fanOut.Stop();
-
-        var offers = carrierResults.SelectMany(r => r.Offers).ToList();
-        var declinations = carrierResults
-            .Where(r => r.Offers.Count == 0)
-            .Select(r => new CarrierDeclination
-            {
-                CarrierId = r.CarrierId,
-                CarrierName = r.CarrierName,
-                Reason = r.DeclineReason ?? "No offer returned.",
-                WasUnavailable = r.Failed
-            })
-            .ToList();
-
-        foreach (var carrierResult in carrierResults)
-        {
-            logger.LogInformation(
-                "Carrier rated. Operation={Operation} QuoteId={QuoteId} CarrierId={CarrierId} " +
-                "OfferCount={OfferCount} Failed={Failed} Reason={Reason} CorrelationId={CorrelationId} ElapsedMs={ElapsedMs}",
-                "RateCarrier", quote.Id, carrierResult.CarrierId, carrierResult.Offers.Count,
-                carrierResult.Failed, carrierResult.DeclineReason, correlationId, carrierResult.ElapsedMs);
-        }
+        var panel = await marketplace.ShopAsync(quote, ct);
 
         // --- No appetite anywhere: refer rather than fabricate an offer.
-        if (offers.Count == 0)
+        if (panel.Offers.Count == 0)
         {
             var reason = "No carrier on the panel will write this risk automatically. " +
                          "A licensed underwriter must review this application.";
             quote.MarkReferral(reason, clock.UtcNow);
             await unitOfWork.SaveChangesAsync(ct);
-            await WriteComparisonDocumentAsync(quote, decision, [], declinations, overall, ct);
+            await marketplace.WriteComparisonDocumentAsync(
+                quote, decision.BaselineAnnualPremium, [], panel.Declinations, overall.ElapsedMilliseconds, ct);
 
             logger.LogWarning(
                 "Quote referred: empty carrier panel. Operation={Operation} QuoteId={QuoteId} " +
                 "QuoteNumber={QuoteNumber} DeclinationCount={DeclinationCount} CorrelationId={CorrelationId} " +
                 "ElapsedMs={ElapsedMs} Result={Result}",
-                "Underwrite", quote.Id, quote.QuoteNumber, declinations.Count, correlationId,
+                "Underwrite", quote.Id, quote.QuoteNumber, panel.Declinations.Count, correlationId,
                 overall.ElapsedMilliseconds, "Referral");
             return UnderwritingResult.Referred(quote, decision);
         }
 
-        quote.MarkRated(offers, clock.UtcNow);
+        quote.MarkRated(panel.Offers, clock.UtcNow);
         await unitOfWork.SaveChangesAsync(ct);
-        await WriteComparisonDocumentAsync(quote, decision, quote.Offers.ToList(), declinations, overall, ct);
+        await marketplace.WriteComparisonDocumentAsync(
+            quote, decision.BaselineAnnualPremium, quote.Offers.ToList(), panel.Declinations,
+            overall.ElapsedMilliseconds, ct);
 
         overall.Stop();
         logger.LogInformation(
@@ -179,101 +155,13 @@ public sealed class UnderwriteQuoteHandler(
             "OfferCount={OfferCount} CarrierCount={CarrierCount} DeclinationCount={DeclinationCount} " +
             "BestCarrier={BestCarrier} BestPremium={BestPremium} BaselinePremium={BaselinePremium} " +
             "CorrelationId={CorrelationId} FanOutMs={FanOutMs} ElapsedMs={ElapsedMs} Result={Result}",
-            "Underwrite", quote.Id, quote.QuoteNumber, offers.Count,
-            offers.Select(o => o.CarrierId).Distinct().Count(), declinations.Count,
+            "Underwrite", quote.Id, quote.QuoteNumber, panel.Offers.Count,
+            panel.Offers.Select(o => o.CarrierId).Distinct().Count(), panel.Declinations.Count,
             quote.BestCarrierId, quote.AnnualPremium, decision.BaselineAnnualPremium,
-            correlationId, fanOut.ElapsedMilliseconds, overall.ElapsedMilliseconds, "Rated");
+            correlationId, panel.FanOutMs, overall.ElapsedMilliseconds, "Rated");
 
-        return UnderwritingResult.Rated(quote, decision, offers.Count);
+        return UnderwritingResult.Rated(quote, decision, panel.Offers.Count);
     }
-
-    /// <summary>
-    /// Writes the denormalised comparison document to the NoSQL store.
-    /// </summary>
-    /// <remarks>
-    /// Failure here is logged but never rethrown. The relational record is the
-    /// source of truth and has already committed; losing a read-model refresh must
-    /// not cause the Service Bus message to be retried and the quote re-underwritten.
-    /// </remarks>
-    private async Task WriteComparisonDocumentAsync(
-        Quote quote,
-        UnderwritingDecision decision,
-        IReadOnlyList<CarrierOffer> offers,
-        IReadOnlyList<CarrierDeclination> declinations,
-        Stopwatch elapsed,
-        CancellationToken ct)
-    {
-        try
-        {
-            var carriers = await catalog.GetActiveCarriersAsync(ct);
-            var byId = carriers.ToDictionary(c => c.CarrierId, StringComparer.OrdinalIgnoreCase);
-            var bestPremium = offers.Count > 0 ? offers.Min(o => o.AnnualPremium) : (decimal?)null;
-
-            var document = new QuoteComparisonDocument
-            {
-                QuoteId = quote.Id,
-                QuoteNumber = quote.QuoteNumber,
-                CustomerName = quote.CustomerName,
-                State = quote.State,
-                VehicleDescription = $"{quote.VehicleYear} {quote.VehicleMake} {quote.VehicleModel}",
-                Status = quote.Status.ToString(),
-                BaselineAnnualPremium = decision.BaselineAnnualPremium,
-                Offers = offers
-                    .OrderBy(o => o.AnnualPremium)
-                    .Select(o => new ComparisonOffer
-                    {
-                        OfferId = o.Id,
-                        CarrierId = o.CarrierId,
-                        CarrierName = o.CarrierName,
-                        Tagline = byId.TryGetValue(o.CarrierId, out var profile) ? profile.Tagline : string.Empty,
-                        BrandColor = byId.TryGetValue(o.CarrierId, out var brand) ? brand.BrandColor : "#1F3C88",
-                        FinancialStrengthRating = o.FinancialStrengthRating,
-                        CoverageTier = o.CoverageTier.ToString(),
-                        AnnualPremium = o.AnnualPremium,
-                        MonthlyPremium = o.MonthlyPremium,
-                        Deductible = o.Deductible,
-                        LimitsSummary =
-                            $"{o.BodilyInjuryPerPerson / 1000}/{o.BodilyInjuryPerAccident / 1000}/{o.PropertyDamage / 1000}",
-                        BodilyInjuryPerPerson = o.BodilyInjuryPerPerson,
-                        BodilyInjuryPerAccident = o.BodilyInjuryPerAccident,
-                        PropertyDamage = o.PropertyDamage,
-                        IncludesRoadside = o.IncludesRoadside,
-                        IncludesRentalReimbursement = o.IncludesRentalReimbursement,
-                        DiscountAmount = o.DiscountAmount,
-                        AppliedDiscounts = SplitDiscounts(o.AppliedDiscounts),
-                        RatingTrace = SplitTrace(o.RatingTrace),
-                        IsBestPrice = bestPremium.HasValue && o.AnnualPremium == bestPremium.Value
-                    })
-                    .ToList(),
-                Declinations = declinations,
-                GeneratedUtc = clock.UtcNow,
-                CorrelationId = quote.CorrelationId,
-                TotalRatingMs = (int)elapsed.ElapsedMilliseconds
-            };
-
-            await comparisonStore.UpsertAsync(document, ct);
-        }
-        catch (Exception ex)
-        {
-            logger.LogError(
-                ex,
-                "Comparison read model was not updated; relational state is authoritative. " +
-                "Operation={Operation} QuoteId={QuoteId} CorrelationId={CorrelationId} Result={Result}",
-                "WriteComparisonDocument", quote.Id, quote.CorrelationId, "Failed");
-        }
-    }
-
-    private static List<string> SplitDiscounts(string value) =>
-        string.IsNullOrWhiteSpace(value)
-            ? []
-            : value.Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).ToList();
-
-    private static List<string> SplitTrace(string value) =>
-        string.IsNullOrWhiteSpace(value)
-            ? []
-            : value.Split('\n', StringSplitOptions.RemoveEmptyEntries)
-                .Select(l => l.TrimEnd('\r'))
-                .ToList();
 }
 
 /// <summary>Outcome of an underwriting run, returned to the worker for logging.</summary>

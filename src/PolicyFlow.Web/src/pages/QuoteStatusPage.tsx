@@ -180,6 +180,16 @@ export function QuoteStatusPage() {
         </Alert>
       )}
 
+      {quote.status === 'FollowUp' && (
+        <Alert variant="warning" title="The underwriter needs more information">
+          <p>{quote.decisionReason}</p>
+          <p style={{ marginTop: 'var(--space-2)' }}>
+            Your application is on hold until this is provided. Your agent will be in
+            touch.
+          </p>
+        </Alert>
+      )}
+
       {quote.status === 'Declined' && (
         <Alert variant="danger" title="Not eligible for this program">
           <p>{quote.decisionReason}</p>

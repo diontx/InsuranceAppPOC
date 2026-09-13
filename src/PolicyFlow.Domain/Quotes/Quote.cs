@@ -9,8 +9,21 @@ namespace PolicyFlow.Domain.Quotes;
 /// <see cref="Status"/> directly. That is what stops a redelivered Service Bus
 /// message from corrupting a quote a concurrent delivery already finished.
 /// </summary>
+/// <remarks>
+/// A referred quote leaves the automated pipeline and is resolved by a human
+/// through <see cref="ApproveReferral"/>, <see cref="RequestFollowUp"/> or
+/// <see cref="DeclineReferral"/>. Those are separate methods from the automated
+/// transitions so the two can never be confused: the worker cannot approve a
+/// referral, and an underwriter cannot rate a quote that never needed review.
+/// </remarks>
 public class Quote
 {
+    /// <summary>Longest underwriter note or decline reason the schema stores.</summary>
+    public const int MaxReviewNoteLength = 500;
+
+    /// <summary>Longest underwriter identity the schema stores.</summary>
+    public const int MaxReviewerLength = 120;
+
     // EF Core materialises entities through this constructor.
     private Quote() { }
 
@@ -58,6 +71,18 @@ public class Quote
 
     /// <summary>Traces this quote across API, SQL, Service Bus and worker logs.</summary>
     public string CorrelationId { get; private set; } = null!;
+
+    /// <summary>Identity of the underwriter who last acted on a referral.</summary>
+    public string? ReviewedBy { get; private set; }
+
+    /// <summary>When the underwriter last acted on a referral.</summary>
+    public DateTime? ReviewedUtc { get; private set; }
+
+    /// <summary>
+    /// The underwriter's note on their last decision. Internal to underwriting,
+    /// unlike <see cref="DecisionReason"/>, which a customer can see.
+    /// </summary>
+    public string? ReviewNote { get; private set; }
 
     public DateTime CreatedUtc { get; private set; }
 
@@ -172,20 +197,7 @@ public class Quote
                 "A rated quote requires at least one carrier offer. Use MarkDecline when no carrier will bind.");
         }
 
-        _offers.Clear();
-        foreach (var offer in ordered)
-        {
-            offer.AttachTo(Id);
-            _offers.Add(offer);
-        }
-
-        var best = ordered[0];
-        Status = QuoteStatus.Rated;
-        AnnualPremium = best.AnnualPremium;
-        BestCarrierId = best.CarrierId;
-        BestCoverageTier = best.CoverageTier;
-        DecisionReason = null;
-        UpdatedUtc = nowUtc;
+        ApplyOffers(ordered, nowUtc);
     }
 
     /// <summary>Routes the quote to a human underwriter. No premium is published.</summary>
@@ -210,6 +222,75 @@ public class Quote
         BestCoverageTier = null;
         DecisionReason = reason;
         UpdatedUtc = nowUtc;
+    }
+
+    // ------------------------------------------------------------------
+    // Underwriter review. Legal only while the quote is in the work queue.
+    // ------------------------------------------------------------------
+
+    /// <summary>
+    /// An underwriter approves a referred risk. The quote becomes
+    /// <see cref="QuoteStatus.Rated"/> with the offers the carrier panel returned
+    /// for it, and can then be bound like any other rated quote.
+    /// </summary>
+    /// <remarks>
+    /// Approval does not invent a price. The underwriter overrides the house
+    /// eligibility rule, but each carrier still applies its own appetite, so a risk
+    /// no carrier will write cannot be approved — only followed up or declined.
+    /// </remarks>
+    public void ApproveReferral(IEnumerable<CarrierOffer> offers, string underwriter, string? note, DateTime nowUtc)
+    {
+        RequireStatus(QuoteStatus.Rated, QuoteStatus.Referral, QuoteStatus.FollowUp);
+        var reviewer = RequireReviewer(underwriter);
+        var trimmedNote = OptionalNote(note);
+
+        var ordered = offers.OrderBy(o => o.AnnualPremium).ToList();
+        if (ordered.Count == 0)
+        {
+            throw new DomainException(
+                $"No carrier on the panel will write quote {QuoteNumber}, so it cannot be approved. " +
+                "Request follow-up or decline it.");
+        }
+
+        ApplyOffers(ordered, nowUtc);
+        RecordReview(reviewer, trimmedNote, nowUtc);
+    }
+
+    /// <summary>
+    /// An underwriter needs more information before deciding. The quote stays in
+    /// the work queue as <see cref="QuoteStatus.FollowUp"/>, and the note becomes
+    /// the customer-facing explanation of what is needed.
+    /// </summary>
+    /// <remarks>
+    /// Allowed from <see cref="QuoteStatus.FollowUp"/> too, so an underwriter can
+    /// revise the request without a decision being forced.
+    /// </remarks>
+    public void RequestFollowUp(string underwriter, string note, DateTime nowUtc)
+    {
+        RequireStatus(QuoteStatus.FollowUp, QuoteStatus.Referral, QuoteStatus.FollowUp);
+        var reviewer = RequireReviewer(underwriter);
+        var requiredNote = RequiredNote(note, "A follow-up request must say what information is needed.");
+
+        Status = QuoteStatus.FollowUp;
+        DecisionReason = requiredNote;
+        UpdatedUtc = nowUtc;
+        RecordReview(reviewer, requiredNote, nowUtc);
+    }
+
+    /// <summary>An underwriter rejects a referred risk.</summary>
+    public void DeclineReferral(string underwriter, string reason, DateTime nowUtc)
+    {
+        RequireStatus(QuoteStatus.Declined, QuoteStatus.Referral, QuoteStatus.FollowUp);
+        var reviewer = RequireReviewer(underwriter);
+        var requiredReason = RequiredNote(reason, "A decline must state the reason.");
+
+        Status = QuoteStatus.Declined;
+        AnnualPremium = null;
+        BestCarrierId = null;
+        BestCoverageTier = null;
+        DecisionReason = requiredReason;
+        UpdatedUtc = nowUtc;
+        RecordReview(reviewer, requiredReason, nowUtc);
     }
 
     /// <summary>
@@ -237,6 +318,76 @@ public class Quote
 
         return _offers.SingleOrDefault(o => o.Id == offerId.Value)
             ?? throw new DomainException($"Offer {offerId} does not belong to quote {QuoteNumber}.");
+    }
+
+    /// <summary>Replaces the offer set and promotes the cheapest offer to the headline.</summary>
+    private void ApplyOffers(List<CarrierOffer> ordered, DateTime nowUtc)
+    {
+        _offers.Clear();
+        foreach (var offer in ordered)
+        {
+            offer.AttachTo(Id);
+            _offers.Add(offer);
+        }
+
+        var best = ordered[0];
+        Status = QuoteStatus.Rated;
+        AnnualPremium = best.AnnualPremium;
+        BestCarrierId = best.CarrierId;
+        BestCoverageTier = best.CoverageTier;
+        DecisionReason = null;
+        UpdatedUtc = nowUtc;
+    }
+
+    private void RecordReview(string reviewer, string? note, DateTime nowUtc)
+    {
+        ReviewedBy = reviewer;
+        ReviewNote = note;
+        ReviewedUtc = nowUtc;
+    }
+
+    private static string RequireReviewer(string underwriter)
+    {
+        // An anonymous decision on a risk is not auditable, so identity is an
+        // invariant of the aggregate rather than something the API remembers to set.
+        if (string.IsNullOrWhiteSpace(underwriter))
+        {
+            throw new DomainException("An underwriter decision must record who made it.");
+        }
+
+        var trimmed = underwriter.Trim();
+        if (trimmed.Length > MaxReviewerLength)
+        {
+            throw new DomainException($"Underwriter identity must be {MaxReviewerLength} characters or fewer.");
+        }
+
+        return trimmed;
+    }
+
+    private static string RequiredNote(string note, string missingMessage)
+    {
+        if (string.IsNullOrWhiteSpace(note))
+        {
+            throw new DomainException(missingMessage);
+        }
+
+        return OptionalNote(note)!;
+    }
+
+    private static string? OptionalNote(string? note)
+    {
+        if (string.IsNullOrWhiteSpace(note))
+        {
+            return null;
+        }
+
+        var trimmed = note.Trim();
+        if (trimmed.Length > MaxReviewNoteLength)
+        {
+            throw new DomainException($"Underwriter notes must be {MaxReviewNoteLength} characters or fewer.");
+        }
+
+        return trimmed;
     }
 
     private void RequireStatus(QuoteStatus target, params QuoteStatus[] allowedFrom)

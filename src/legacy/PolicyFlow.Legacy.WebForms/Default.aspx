@@ -36,6 +36,10 @@
                                NavigateUrl="~/QuoteStatus.aspx"
                                CssClass="legacy-button"
                                Text="STATUS INQUIRY" />
+                <asp:HyperLink ID="lnkUnderwritingQueue" runat="server"
+                               NavigateUrl="~/Underwriting.aspx"
+                               CssClass="legacy-button"
+                               Text="UNDERWRITING QUEUE" />
             </div>
         </div>
     </div>

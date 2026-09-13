@@ -42,6 +42,7 @@
             <asp:HyperLink ID="lnkHome" runat="server" NavigateUrl="~/Default.aspx" Text="Home" />
             <asp:HyperLink ID="lnkQuoteEntry" runat="server" NavigateUrl="~/QuoteEntry.aspx" Text="Quote Entry" />
             <asp:HyperLink ID="lnkQuoteStatus" runat="server" NavigateUrl="~/QuoteStatus.aspx" Text="Quote Status" />
+            <asp:HyperLink ID="lnkUnderwriting" runat="server" NavigateUrl="~/Underwriting.aspx" Text="Underwriting" />
         </div>
 
         <div class="legacy-content">

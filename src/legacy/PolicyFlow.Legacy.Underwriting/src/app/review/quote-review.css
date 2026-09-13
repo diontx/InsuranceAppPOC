@@ -1,0 +1,165 @@
+:host {
+  display: block;
+}
+
+.uw-review {
+  display: grid;
+  gap: 10px;
+  padding: 10px;
+}
+
+.uw-review__submitted {
+  margin: 0;
+  color: var(--uw-muted);
+}
+
+.uw-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 8px 10px;
+}
+
+.uw-field--wide {
+  grid-column: span 2;
+}
+
+.uw-trace {
+  margin-top: 8px;
+}
+
+.uw-trace summary {
+  cursor: pointer;
+  font-weight: bold;
+  color: #37414d;
+}
+
+.uw-trace ol {
+  margin: 6px 0 0;
+  padding-left: 22px;
+}
+
+.uw-trace li {
+  font-size: 11px;
+}
+
+.uw-appetite__summary {
+  margin: 0 0 6px;
+}
+
+.uw-appetite {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.uw-appetite li {
+  display: flex;
+  gap: 8px;
+  padding: 5px 8px;
+  border: 1px solid #cfe3d8;
+  background: var(--uw-success-bg);
+}
+
+.uw-appetite li.is-declined {
+  border-color: #e3e8ef;
+  background: #f6f8fb;
+  color: var(--uw-muted);
+}
+
+.uw-appetite__mark {
+  width: 12px;
+  font-weight: bold;
+  color: var(--uw-success);
+}
+
+.is-declined .uw-appetite__mark {
+  color: var(--uw-danger);
+}
+
+.uw-appetite__reason {
+  display: block;
+  font-size: 11px;
+}
+
+.uw-last-review {
+  margin: 0;
+}
+
+.uw-last-review q {
+  display: block;
+  margin-top: 4px;
+  font-style: italic;
+}
+
+.uw-decision {
+  border-color: var(--uw-blue);
+  background: #f8fafd;
+}
+
+.uw-options {
+  display: grid;
+  gap: 6px;
+  margin: 0 0 8px;
+  padding: 0;
+  border: 0;
+}
+
+.uw-option {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  padding: 8px;
+  border: 1px solid var(--uw-line);
+  background: var(--uw-surface);
+  cursor: pointer;
+}
+
+.uw-option.is-chosen {
+  border-color: var(--uw-blue);
+  box-shadow: inset 3px 0 0 var(--uw-blue);
+}
+
+.uw-option.is-disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+}
+
+.uw-option input {
+  margin: 2px 0 0;
+}
+
+.uw-option__label {
+  display: block;
+  font-weight: bold;
+}
+
+.uw-option__description {
+  display: block;
+  color: var(--uw-muted);
+  font-size: 11px;
+}
+
+.uw-field--note textarea {
+  width: 100%;
+  resize: vertical;
+}
+
+.uw-note__count {
+  justify-self: end;
+  color: var(--uw-muted);
+  font-size: 10px;
+}
+
+.uw-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 8px;
+}
+
+@media (max-width: 520px) {
+  .uw-field--wide {
+    grid-column: auto;
+  }
+}

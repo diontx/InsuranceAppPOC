@@ -18,6 +18,7 @@ NoSQL, React and legacy-Web-Forms extensions requested for this build.
 | 10 | Legacy Web Forms project + compatibility seam | ✅ Complete |
 | 11 | Docker Compose end-to-end | ✅ Complete |
 | 12 | CI pipeline + documentation | ✅ Complete |
+| 13 | Underwriter work queue — Angular module in the legacy portal | ✅ Complete |
 
 **Final verification** (from empty volumes, `docker compose down -v` →
 `up --build`):
@@ -555,6 +556,94 @@ Status: **Complete**
   pipeline if a `.env` reaches the artifact.
 - **Deployment is commented out and gated on manual approval.** Container Apps has
   a free grant but ancillary resources still cost money.
+
+---
+
+## Phase 13 — Underwriter Work Queue (Angular in the Legacy Portal)
+
+Status: **Complete**
+
+### Completed
+- **Domain:** `QuoteStatus.FollowUp`; `Quote.ApproveReferral`, `RequestFollowUp`,
+  `DeclineReferral`, legal only from `Referral`/`FollowUp`, each recording
+  `ReviewedBy`, `ReviewedUtc`, `ReviewNote`.
+- **Persistence:** `AddUnderwriterReview` migration (three nullable columns); queue
+  read served by the existing `IX_Quotes_Status_CreatedUtc`.
+- **Application:** `CarrierMarketplace` extracted from `UnderwriteQuoteHandler` so
+  approval shops the panel through the same code; `GetUnderwritingQueueHandler`,
+  `GetUnderwritingReviewHandler`, `ReviewReferralHandler` and its validator.
+- **API:** `GET /api/underwriting/queue`, `GET /api/underwriting/quotes/{id}`,
+  `POST /api/underwriting/quotes/{id}/decision`, behind a new `referrals:review`
+  policy granted to the `Underwriter` role.
+- **Angular 22 module** (`src/legacy/PolicyFlow.Legacy.Underwriting`): standalone
+  components, signals store, reactive form with decision-dependent validators,
+  functional HTTP interceptor, zoneless; builds into the Web Forms project.
+- **Web Forms host:** `Underwriting.aspx` plus nav and home-page links; the legacy
+  status page treats `FOLLOWUP` as terminal.
+- **React SPA:** shows a customer the underwriter's follow-up request.
+- **CI:** an Angular job in the Frontend stage (test, production build, artifact).
+
+### Verification
+- `dotnet build` → **PASS**, 0 warnings
+- `dotnet test` → **PASS, 366** (161 domain, 119 application, 86 integration on real SQL Server)
+- `npm run test:ci` (Angular module) → **PASS, 67**; `npm run build` → **PASS**, 250 kB
+- `npm run lint`, `npm run test:ci` (React) → **PASS, 41**
+- `msbuild src\legacy\PolicyFlow.Legacy.sln` → **PASS**
+- `aspnet_compiler` on the Web Forms project, including `Underwriting.aspx` → **PASS (exit 0)**
+- Rebuilt containers; migration applied on startup
+- Live: queue lists referrals from both channels; follow-up without a note → 400;
+  approving a risk no carrier will write → 422 with its reason; follow-up → 200 and
+  the customer status endpoint shows `FollowUp` with the note
+- **Legacy portal under IIS Express** (`http://localhost:8095`), driven in Chrome:
+  `QuoteEntry.aspx` postback → `Q-2026-000013` PENDING → `QuoteStatus.aspx`
+  UpdatePanel polling → REFERRAL → `Underwriting.aspx` loads the Angular module and
+  the queue cross-origin, Enter in its search box causes **no** postback, follow-up
+  recorded → `QuoteStatus.aspx` shows FOLLOWUP with the note and stops polling;
+  approval from `Underwriting.aspx` → Rated with 9 offers
+
+### Important decisions
+- **Angular module in a Web Forms host, not a Web Forms page.** New code is written
+  against the platform that outlives the shell. See `LEGACY-MODERNIZATION.md`.
+- **Modern endpoints, not the legacy seam.** The seam exists for code that cannot
+  change.
+- **Approval overrides the house rule, never carrier appetite.** A risk no carrier
+  will write cannot be approved; the review screen shows appetite up front so the
+  underwriter knows before pressing Approve.
+- **Approval calls carriers synchronously**, unlike quote submission: an internal
+  user needs the answer now, the fan-out is concurrent, and no transaction is open
+  during it.
+- **The decision-maker comes from the token**, never the request body; relaxed-auth
+  decisions are recorded as `demo-underwriter (unauthenticated)`.
+- **`FollowUp` is terminal** for the worker and for polling clients.
+
+### Bugs found and fixed
+- **FluentValidation applies a trailing `.When()` to every validator in the chain.**
+  `Must(required).Must(minLength).When(notBlank)` silently switched off the
+  required check for blank notes — caught by the application and integration tests
+  (a blank follow-up reached the domain and returned 422 instead of 400).
+- **`formControlName` discards errors set with `setErrors()`.** When the directive
+  attaches it recomputes validity, so a server 400 applied that way vanished. The
+  server's message is now a validator tied to the note text it was about.
+- **Two effects touching one form control have no guaranteed order.** The reset
+  effect could wipe the server error. Merged into one ordered effect.
+- **Enter in the queue search box would post back the Web Forms page**, because the
+  master page wraps content in `<form runat="server">`. Prevented, with a spec.
+- **API timestamps have no `Z`.** SQL Server `datetime2` materialises with an
+  unspecified kind, so `new Date()` would read "time in queue" in local time. The
+  module parses `...Utc` fields as UTC.
+
+- **`QuoteEntry.aspx` and `QuoteStatus.aspx` had never rendered.** Found the first
+  time the portal ran under IIS Express, and older than this phase: with
+  `httpRuntime targetFramework="4.8"`, validator controls default to unobtrusive
+  validation, which requires a `jquery` ScriptResourceMapping this project does not
+  have. Both pages threw on render and `customErrors` silently redirected to
+  `Default.aspx`. `msbuild` and `aspnet_compiler` both passed, because it is a
+  render-time failure. Fixed with
+  `ValidationSettings:UnobtrusiveValidationMode=None` in `Web.config`.
+- **CORS for the IIS-hosted portal.** An existing `.env` overrides the compose
+  default, so the API rejected the Angular module's cross-origin calls until
+  `http://localhost:8095` (command line) and `https://localhost:44390` (Visual
+  Studio) were added to `CORS_ALLOWED_ORIGINS`.
 
 ---
 

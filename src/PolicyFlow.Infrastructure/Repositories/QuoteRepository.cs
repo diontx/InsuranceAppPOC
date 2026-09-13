@@ -66,6 +66,22 @@ public sealed class QuoteRepository(PolicyFlowDbContext db) : IQuoteRepository
             : null;
     }
 
+    /// <remarks>
+    /// <c>AsNoTracking</c>: the queue is a read-only projection, and tracking up to
+    /// <paramref name="maxResults"/> aggregates the caller never modifies is wasted
+    /// work. The cap exists because an unbounded queue read is a query that is fine
+    /// in a demo and a timeout during a referral backlog.
+    /// </remarks>
+    public async Task<IReadOnlyList<Quote>> GetAwaitingUnderwriterAsync(
+        int maxResults,
+        CancellationToken ct = default) =>
+        await db.Quotes
+            .AsNoTracking()
+            .Where(q => q.Status == QuoteStatus.Referral || q.Status == QuoteStatus.FollowUp)
+            .OrderBy(q => q.CreatedUtc)
+            .Take(maxResults)
+            .ToListAsync(ct);
+
     public async Task AddAsync(Quote quote, CancellationToken ct = default) =>
         await db.Quotes.AddAsync(quote, ct);
 

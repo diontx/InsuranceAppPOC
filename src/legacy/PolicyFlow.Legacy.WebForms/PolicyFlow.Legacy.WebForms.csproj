@@ -110,8 +110,17 @@
     <Content Include="Default.aspx" />
     <Content Include="QuoteEntry.aspx" />
     <Content Include="QuoteStatus.aspx" />
+    <Content Include="Underwriting.aspx" />
     <Content Include="Site.master" />
     <Content Include="Styles\legacy.css" />
+    <!--
+      The Angular underwriting module's build output (npm run build in
+      src\legacy\PolicyFlow.Legacy.Underwriting). A wildcard, because the Angular
+      build owns the file list, and not committed: it is generated. When it is
+      absent the wildcard matches nothing and Underwriting.aspx says the module
+      has not been built.
+    -->
+    <Content Include="Scripts\underwriting\**\*.*" />
   </ItemGroup>
 
   <ItemGroup>
@@ -135,6 +144,13 @@
     </Compile>
     <Compile Include="QuoteStatus.aspx.designer.cs">
       <DependentUpon>QuoteStatus.aspx</DependentUpon>
+    </Compile>
+    <Compile Include="Underwriting.aspx.cs">
+      <DependentUpon>Underwriting.aspx</DependentUpon>
+      <SubType>ASPXCodeBehind</SubType>
+    </Compile>
+    <Compile Include="Underwriting.aspx.designer.cs">
+      <DependentUpon>Underwriting.aspx</DependentUpon>
     </Compile>
     <Compile Include="Site.master.cs">
       <DependentUpon>Site.master</DependentUpon>

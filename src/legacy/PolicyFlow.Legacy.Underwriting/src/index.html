@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Underwriting - PolicyFlow Agent Portal (dev host)</title>
+  <base href="/">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <!-- No favicon on the dev host; an empty data URI stops the 404 console noise. -->
+  <link rel="icon" href="data:,">
+</head>
+<body>
+  <!--
+    DEVELOPMENT HOST ONLY. Used by `ng serve`; the production build does not emit
+    this file. It reproduces the Site.master chrome, and the development build
+    bundles the portal's real legacy.css (src/dev-host.css), so the module is
+    developed inside the page it ships into. In the
+    portal, Underwriting.aspx hosts <uw-workbench> instead.
+  -->
+  <div class="legacy-banner">DEMONSTRATION SYSTEM &mdash; all carriers, rates and premiums are fictional</div>
+
+  <div class="legacy-header">
+    <div class="legacy-header-inner">
+      <span class="legacy-logo">PolicyFlow</span>
+      <span class="legacy-logo-sub">AGENT PORTAL &mdash; LEGACY</span>
+      <span class="legacy-build">
+        v2.4.1 &middot; ASP.NET Web Forms &middot; .NET Framework 4.8 &middot; Angular underwriting module
+      </span>
+    </div>
+  </div>
+
+  <div class="legacy-nav">
+    <a href="/" aria-current="page">Underwriting</a>
+  </div>
+
+  <div class="legacy-content">
+    <uw-workbench></uw-workbench>
+  </div>
+
+  <div class="legacy-footer">
+    <p>
+      Angular dev server for the underwriting module. <code>/api</code> is proxied to the
+      PolicyFlow API on localhost:8081. In the portal this page is Underwriting.aspx.
+    </p>
+  </div>
+</body>
+</html>

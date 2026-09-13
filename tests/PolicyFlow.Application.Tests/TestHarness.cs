@@ -5,6 +5,7 @@ using PolicyFlow.Application.Carriers;
 using PolicyFlow.Application.Payments;
 using PolicyFlow.Application.Policies;
 using PolicyFlow.Application.Quotes;
+using PolicyFlow.Application.Underwriting;
 using PolicyFlow.Domain.Carriers;
 using PolicyFlow.Domain.Common;
 using PolicyFlow.Domain.Quotes;
@@ -52,7 +53,11 @@ internal sealed class TestHarness : IAsyncDisposable
     public SubmitQuoteHandler SubmitQuote { get; }
     public GetQuoteHandler GetQuote { get; }
     public GetQuoteOffersHandler GetOffers { get; }
+    public CarrierMarketplace Marketplace { get; }
     public UnderwriteQuoteHandler Underwrite { get; }
+    public GetUnderwritingQueueHandler UnderwritingQueue { get; }
+    public GetUnderwritingReviewHandler UnderwritingReview { get; }
+    public ReviewReferralHandler ReviewReferral { get; }
     public CreatePolicyFromQuoteHandler CreatePolicy { get; }
     public GetPolicyHandler GetPolicy { get; }
     public SubmitPaymentHandler SubmitPayment { get; }
@@ -103,9 +108,20 @@ internal sealed class TestHarness : IAsyncDisposable
         GetOffers = new GetQuoteOffersHandler(
             ComparisonStore, Quotes, Catalog, NullLogger<GetQuoteOffersHandler>.Instance);
 
+        Marketplace = new CarrierMarketplace(
+            Catalog, carrierGateway, ComparisonStore, Clock, NullLogger<CarrierMarketplace>.Instance);
+
         Underwrite = new UnderwriteQuoteHandler(
-            Quotes, UnitOfWork, Catalog, carrierGateway, ComparisonStore, verifier,
+            Quotes, UnitOfWork, Marketplace, verifier,
             quoteRating, Clock, NullLogger<UnderwriteQuoteHandler>.Instance);
+
+        UnderwritingQueue = new GetUnderwritingQueueHandler(Quotes, Clock);
+
+        UnderwritingReview = new GetUnderwritingReviewHandler(Quotes, Catalog, quoteRating, carrierRating);
+
+        ReviewReferral = new ReviewReferralHandler(
+            Quotes, UnitOfWork, Marketplace, UnderwritingReview, Clock,
+            NullLogger<ReviewReferralHandler>.Instance);
 
         CreatePolicy = new CreatePolicyFromQuoteHandler(
             Quotes, Policies, UnitOfWork, Clock, Correlation,

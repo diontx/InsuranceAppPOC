@@ -448,6 +448,113 @@ One carrier. 404 if unknown or inactive.
 
 ---
 
+## Underwriting
+
+The underwriter work queue. Consumed by the Angular module that the legacy
+portal hosts in `Underwriting.aspx` — but these are **modern** endpoints
+(camelCase, ProblemDetails), not the legacy seam: a new screen is built against
+the platform it will outlive the portal on.
+
+**Policy** `referrals:review` on all three (the `Underwriter` role, or that
+scope). Separate from `quotes:read` because the queue lists every referred
+applicant, not one quote the caller already holds the id of.
+
+A quote is in the queue while its status is `Referral` (the pipeline referred it)
+or `FollowUp` (an underwriter asked for more information). Both are terminal for
+the worker: nothing automated changes them.
+
+### `GET /api/underwriting/queue`
+
+Oldest submission first, capped at 200 (`isTruncated` says when there are more).
+
+```json
+{
+  "items": [
+    {
+      "quoteId": "4a0f5c1e-...",
+      "quoteNumber": "Q-2026-000006",
+      "customerName": "Riley Morgan",
+      "state": "GA",
+      "vehicleDescription": "2023 Honda Civic",
+      "status": "Referral",
+      "reason": "No prior insurance on record. A licensed underwriter must review this application.",
+      "channel": "Modern",
+      "submittedUtc": "2026-09-13T16:45:02.117",
+      "updatedUtc": "2026-09-13T16:45:03.912"
+    }
+  ],
+  "referralCount": 4,
+  "followUpCount": 1,
+  "isTruncated": false,
+  "generatedUtc": "2026-09-13T16:52:40.031"
+}
+```
+
+Timestamps are UTC but carry no `Z` (SQL Server `datetime2` stores no offset).
+Clients should read the `Utc` suffix as the contract; the Angular module does.
+
+### `GET /api/underwriting/quotes/{quoteId}`
+
+The application plus what the underwriter needs to decide. The eligibility trace
+and carrier appetite are computed by the domain services, not by the client.
+
+```json
+{
+  "quoteNumber": "Q-2026-000006",
+  "status": "Referral",
+  "isAwaitingReview": true,
+  "customerName": "Riley Morgan",
+  "state": "GA",
+  "vehicleYear": 2023, "vehicleMake": "Honda", "vehicleModel": "Civic",
+  "annualMileage": 12000,
+  "priorInsuranceMonths": 0,
+  "decisionReason": "No prior insurance on record. ...",
+  "eligibilityOutcome": "Refer",
+  "eligibilityTrace": ["REFER: no verifiable prior insurance; manual underwriting required."],
+  "carrierAppetite": [
+    { "carrierId": "liberty-crest", "carrierName": "Liberty Crest Insurance", "willWrite": true },
+    { "carrierId": "summit-shield", "carrierName": "Summit Shield Mutual", "willWrite": false,
+      "reason": "Summit Shield Mutual requires 6 months of prior coverage; quote has 0." }
+  ],
+  "offerCount": 0
+}
+```
+
+After a decision it also carries `reviewedBy`, `reviewedUtc`, `reviewNote`, and,
+once approved, `annualPremium`, `bestCarrierId` and `offerCount`.
+
+### `POST /api/underwriting/quotes/{quoteId}/decision`
+
+```json
+{ "decision": "FollowUp", "note": "Upload the declarations page from your last policy." }
+```
+
+| `decision` | `note` | Effect |
+|---|---|---|
+| `Approve` | optional | Shops the carrier panel (the same fan-out the worker uses), status → `Rated`. Bindable like any rated quote. |
+| `FollowUp` | required, 10–500 chars | Status → `FollowUp`; stays in the queue. The note becomes the customer-visible `decisionReason`. |
+| `Decline` | required, 10–500 chars | Status → `Declined`; leaves the queue. |
+
+Returns **200** with the updated review. Who decided is taken from the token's
+`name` claim — there is no underwriter field in the body, so it cannot be spoofed.
+With `REQUIRE_AUTHENTICATION=false` it is recorded as
+`demo-underwriter (unauthenticated)`, so demo decisions are never mistaken for a
+real person's.
+
+| Status | When |
+|---|---|
+| 400 | Unknown `decision`, or a missing/short note for `FollowUp`/`Decline` (`errors.Note`) |
+| 404 | No such quote |
+| 409 | The quote is no longer awaiting review — typically another underwriter decided first. Concurrent decisions are resolved by the `rowversion` on `Quotes`: exactly one wins. |
+| 422 | `Approve` on a risk no carrier will write. Follow up or decline instead. |
+
+Approval calls the carrier gateways synchronously — unlike `POST /api/quotes`,
+which never does. The caller is an internal user who needs to know immediately
+whether any carrier will write the risk, the fan-out is concurrent (roughly the
+slowest carrier), and no transaction is open while it runs.
+
+---
+
 ## Legacy compatibility
 
 The modernization seam. Same application logic as `/api/quotes`; different wire

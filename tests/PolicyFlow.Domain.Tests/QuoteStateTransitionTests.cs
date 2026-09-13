@@ -177,6 +177,7 @@ public class QuoteStateTransitionTests
     [InlineData(QuoteStatus.Rated, true)]
     [InlineData(QuoteStatus.Referral, true)]
     [InlineData(QuoteStatus.Declined, true)]
+    [InlineData(QuoteStatus.FollowUp, true)]
     [InlineData(QuoteStatus.Pending, false)]
     [InlineData(QuoteStatus.Processing, false)]
     public void TerminalStatusesAreCorrectlyIdentified(QuoteStatus status, bool expectedTerminal)

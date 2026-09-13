@@ -25,6 +25,13 @@ public interface IQuoteRepository
     /// </summary>
     Task<Quote?> FindForSelfServiceLookupAsync(string quoteNumber, string lastName, CancellationToken ct = default);
 
+    /// <summary>
+    /// The underwriter work queue: quotes in <c>Referral</c> or <c>FollowUp</c>,
+    /// oldest first so the longest-waiting applicant is reviewed first. Read-only
+    /// and without offers, because a queue row needs neither.
+    /// </summary>
+    Task<IReadOnlyList<Quote>> GetAwaitingUnderwriterAsync(int maxResults, CancellationToken ct = default);
+
     Task AddAsync(Quote quote, CancellationToken ct = default);
 
     /// <summary>Allocates the next sequential quote number, e.g. Q-2026-000042.</summary>

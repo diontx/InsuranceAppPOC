@@ -38,7 +38,13 @@ export function QuoteTimeline({ status }: QuoteTimelineProps) {
   // The terminal step is labelled with the outcome actually reached, so a
   // referral or decline is not shown as a failure to become "Rated".
   const terminalLabel =
-    status === 'Referral' ? 'Referred' : status === 'Declined' ? 'Declined' : 'Rated';
+    status === 'Referral'
+      ? 'Referred'
+      : status === 'Declined'
+        ? 'Declined'
+        : status === 'FollowUp'
+          ? 'Info requested'
+          : 'Rated';
 
   const steps = [
     { key: 'submitted', label: 'Submitted' },
@@ -50,7 +56,10 @@ export function QuoteTimeline({ status }: QuoteTimelineProps) {
     status === 'Pending' ? 0 : status === 'Processing' ? 1 : 2;
 
   const isTerminal =
-    status === 'Rated' || status === 'Referral' || status === 'Declined';
+    status === 'Rated' ||
+    status === 'Referral' ||
+    status === 'Declined' ||
+    status === 'FollowUp';
 
   return (
     <ol className="timeline" aria-label="Quote progress">

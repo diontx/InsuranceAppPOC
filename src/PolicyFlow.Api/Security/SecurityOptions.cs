@@ -102,6 +102,13 @@ public static class PolicyFlowPolicies
 
     /// <summary>Legacy system-to-system calls. Service principals, not users.</summary>
     public const string LegacyIntegration = "legacy:integrate";
+
+    /// <summary>
+    /// Work the underwriting queue: list referrals and record decisions. Separate
+    /// from <see cref="ReadQuotes"/> because the queue lists every referred
+    /// applicant, not one quote the caller already knows the id of.
+    /// </summary>
+    public const string ReviewReferrals = "referrals:review";
 }
 
 /// <summary>Role names issued by the simulated identity provider.</summary>

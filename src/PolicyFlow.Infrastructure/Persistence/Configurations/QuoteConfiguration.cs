@@ -68,6 +68,11 @@ public sealed class QuoteConfiguration : IEntityTypeConfiguration<Quote>
 
         builder.Property(q => q.CorrelationId).HasMaxLength(64).IsRequired();
 
+        // Underwriter review. Lengths come from the aggregate so the schema and the
+        // domain invariant cannot drift apart.
+        builder.Property(q => q.ReviewedBy).HasMaxLength(Quote.MaxReviewerLength);
+        builder.Property(q => q.ReviewNote).HasMaxLength(Quote.MaxReviewNoteLength);
+
         // rowversion: SQL Server stamps this on every UPDATE. EF Core includes it
         // in the WHERE clause, so a lost update raises DbUpdateConcurrencyException
         // instead of silently overwriting a concurrent change.
@@ -75,7 +80,9 @@ public sealed class QuoteConfiguration : IEntityTypeConfiguration<Quote>
             .IsRowVersion()
             .IsConcurrencyToken();
 
-        // Supports the worker sweeping for quotes stuck in a non-terminal state.
+        // Supports the worker sweeping for quotes stuck in a non-terminal state, and
+        // the underwriter work queue (Status IN (Referral, FollowUp) ORDER BY
+        // CreatedUtc), which is the same seek-then-ordered-scan shape.
         builder.HasIndex(q => new { q.Status, q.CreatedUtc })
             .HasDatabaseName("IX_Quotes_Status_CreatedUtc");
 
