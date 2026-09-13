@@ -64,6 +64,27 @@ public sealed record QuoteStatusView
 /// </summary>
 public sealed class GetQuoteHandler(IQuoteRepository quotes)
 {
+    /// <summary>Most quotes one agent's list returns.</summary>
+    public const int MaxAgentQuotes = 100;
+
+    /// <summary>The quotes an agent submitted, newest first, with their current status.</summary>
+    /// <remarks>
+    /// The same <see cref="QuoteStatusView"/> the single-quote endpoint returns, so a
+    /// row in the agent's list and the quote's own status page cannot disagree.
+    /// </remarks>
+    public async Task<IReadOnlyList<QuoteStatusView>> ListSubmittedByAsync(
+        string submittedBy,
+        CancellationToken ct = default)
+    {
+        if (string.IsNullOrWhiteSpace(submittedBy))
+        {
+            return [];
+        }
+
+        var submitted = await quotes.GetSubmittedByAsync(submittedBy.Trim(), MaxAgentQuotes, ct);
+        return submitted.Select(QuoteStatusView.From).ToList();
+    }
+
     public async Task<QuoteStatusView?> HandleAsync(Guid quoteId, CancellationToken ct = default)
     {
         var quote = await quotes.GetWithOffersAsync(quoteId, ct);

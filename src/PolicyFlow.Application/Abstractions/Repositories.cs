@@ -32,6 +32,9 @@ public interface IQuoteRepository
     /// </summary>
     Task<IReadOnlyList<Quote>> GetAwaitingUnderwriterAsync(int maxResults, CancellationToken ct = default);
 
+    /// <summary>Quotes one agent submitted, newest first, with offers for the count.</summary>
+    Task<IReadOnlyList<Quote>> GetSubmittedByAsync(string submittedBy, int maxResults, CancellationToken ct = default);
+
     Task AddAsync(Quote quote, CancellationToken ct = default);
 
     /// <summary>Allocates the next sequential quote number, e.g. Q-2026-000042.</summary>

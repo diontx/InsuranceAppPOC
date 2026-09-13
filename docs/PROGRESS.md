@@ -19,6 +19,8 @@ NoSQL, React and legacy-Web-Forms extensions requested for this build.
 | 11 | Docker Compose end-to-end | ✅ Complete |
 | 12 | CI pipeline + documentation | ✅ Complete |
 | 13 | Underwriter work queue — Angular module in the legacy portal | ✅ Complete |
+| 14 | Underwriter work queue — React page in the modern SPA (contrast) | ✅ Complete |
+| 15 | Agent workspace — submit quotes and track your own | ✅ Complete |
 
 **Final verification** (from empty volumes, `docker compose down -v` →
 `up --build`):
@@ -644,6 +646,80 @@ Status: **Complete**
   default, so the API rejected the Angular module's cross-origin calls until
   `http://localhost:8095` (command line) and `https://localhost:44390` (Visual
   Studio) were added to `CORS_ALLOWED_ORIGINS`.
+
+---
+
+## Phase 14 — Underwriter Work Queue in React (Contrast)
+
+Status: **Complete**
+
+### Completed
+- `/underwriting` route and nav link in the React SPA: `UnderwritingPage`,
+  `WorkQueue`, `QuoteReview`, `useUnderwritingWorkbench`, `reviewNoteRules`.
+- Feature parity with the Angular module: status filter and search, time in queue,
+  read-only application, eligibility trace, carrier appetite with Approve disabled
+  when no carrier will write, note rules per decision, server 400 beside the note,
+  409 reloads queue and quote, plain-language outcome.
+- Client methods and wire types for `/api/underwriting`; `parseUtc`,
+  `formatDateTime`, `formatTimeInQueue` helpers.
+- Concern-by-concern comparison in `LEGACY-MODERNIZATION.md`.
+- No API, domain or database change: both UIs share the Phase 13 endpoints.
+
+### Verification
+- `npm run lint` → **PASS** (clean); `npm run test:ci` → **PASS, 81** (40 new);
+  `npm run build` → **PASS**
+- Web container rebuilt; walked in Chrome at `http://localhost:8080/underwriting`
+
+### Important decisions
+- **A page-scoped hook, not a global store.** Nothing outside the page needs the
+  queue state.
+- **Reset by `key`, validation derived during render.** No effects synchronising
+  form state — the idiomatic React counterparts of the Angular module's effect and
+  reactive-form validators, which is what the contrast is meant to show.
+- **Refs for values read in async callbacks.** State captured by a callback is the
+  value from its render, so a double-click inside one render would otherwise send
+  two decisions. A test fires both calls in the same `act`.
+
+---
+
+## Phase 15 — Agent Workspace
+
+Status: **Complete**
+
+### Completed
+- **Domain/persistence:** `Quote.SubmittedBy` (optional on `Quote.Submit`, trimmed,
+  length-checked); `AddQuoteSubmittedBy` migration with
+  `IX_Quotes_SubmittedBy_CreatedUtc`.
+- **Application:** `SubmitQuoteCommand.SubmittedBy`;
+  `GetQuoteHandler.ListSubmittedByAsync` returning `QuoteStatusView`s.
+- **API:** `POST /api/quotes` attributes the quote from the token;
+  `GET /api/quotes/mine` lists the caller's quotes and returns 401 without a token.
+- **React:** `/agent` route and nav link — simulated sign-in (`agentSession`),
+  `QuoteForm` extracted from the new-quote page and shared, `useAgentQuotes`
+  (refreshes while any quote is non-terminal, pauses at a cap), quote table with
+  status, outcome, premium and a link to the comparison page.
+
+### Verification
+- `dotnet build` → **PASS**, 0 warnings; `dotnet test` → **PASS, 384**
+  (167 domain, 125 application, 92 integration on real SQL Server)
+- `npm run lint` → **PASS**; `npm run test:ci` → **PASS, 104**; `npm run build` → **PASS**
+- Containers rebuilt, migration applied; walked in Chrome at `http://localhost:8080/agent`
+
+### Important decisions
+- **Identity from the token, never the body** — the same rule as underwriter
+  decisions.
+- **`/mine` is 401 even with authorization relaxed.** Relaxed policies let an
+  anonymous caller *act*; they cannot tell the API who "mine" is.
+- **The token is opt-in per API call.** Sent when submitting as the agent and listing
+  their quotes, never on customer or underwriter calls — otherwise a decision made
+  on the underwriting page in the same browser would be recorded as the agent's.
+- **One quote form.** Extracted rather than copied, so the customer and agent pages
+  cannot validate differently. The existing new-quote tests pass unchanged against
+  the extracted component.
+- **Refreshing has a cap.** A quote stuck in Processing (worker down, dead-lettered
+  message) must not keep an open tab polling indefinitely.
+- **Signed-in and signed-out are separate components**, so signing out unmounts the
+  workspace and the next agent never sees the previous agent's list.
 
 ---
 

@@ -73,6 +73,13 @@ public sealed class QuoteConfiguration : IEntityTypeConfiguration<Quote>
         builder.Property(q => q.ReviewedBy).HasMaxLength(Quote.MaxReviewerLength);
         builder.Property(q => q.ReviewNote).HasMaxLength(Quote.MaxReviewNoteLength);
 
+        builder.Property(q => q.SubmittedBy).HasMaxLength(Quote.MaxSubmitterLength);
+
+        // The agent's "my quotes" list: equality on the agent, newest first. Without
+        // it the query scans every quote to find one agent's.
+        builder.HasIndex(q => new { q.SubmittedBy, q.CreatedUtc })
+            .HasDatabaseName("IX_Quotes_SubmittedBy_CreatedUtc");
+
         // rowversion: SQL Server stamps this on every UPDATE. EF Core includes it
         // in the WHERE clause, so a lost update raises DbUpdateConcurrencyException
         // instead of silently overwriting a concurrent change.

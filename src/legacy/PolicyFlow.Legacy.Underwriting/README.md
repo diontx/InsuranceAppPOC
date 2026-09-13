@@ -3,6 +3,10 @@
 The underwriter work queue for the legacy agent portal: pick a referred quote,
 review the application, and **approve**, **request follow-up** or **decline** it.
 
+The same screen exists in React in the modern SPA (`/underwriting` in
+`src/PolicyFlow.Web`), against the same API, for side-by-side comparison — see the
+table in `docs/LEGACY-MODERNIZATION.md`.
+
 An Angular 22 standalone application that runs *inside* a Web Forms page
 (`../PolicyFlow.Legacy.WebForms/Underwriting.aspx`) and talks to the modern API
 (`/api/underwriting`). It is the pattern for adding new functionality to a legacy

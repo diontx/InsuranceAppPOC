@@ -82,6 +82,24 @@ public sealed class QuoteRepository(PolicyFlowDbContext db) : IQuoteRepository
             .Take(maxResults)
             .ToListAsync(ct);
 
+    /// <remarks>
+    /// Split query: a single query joining up to 15 offers onto each of
+    /// <paramref name="maxResults"/> quotes would repeat every quote column once per
+    /// offer. Two round trips are cheaper than that cartesian row set.
+    /// </remarks>
+    public async Task<IReadOnlyList<Quote>> GetSubmittedByAsync(
+        string submittedBy,
+        int maxResults,
+        CancellationToken ct = default) =>
+        await db.Quotes
+            .AsNoTracking()
+            .Include(q => q.Offers)
+            .Where(q => q.SubmittedBy == submittedBy)
+            .OrderByDescending(q => q.CreatedUtc)
+            .Take(maxResults)
+            .AsSplitQuery()
+            .ToListAsync(ct);
+
     public async Task AddAsync(Quote quote, CancellationToken ct = default) =>
         await db.Quotes.AddAsync(quote, ct);
 

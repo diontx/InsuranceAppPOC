@@ -140,7 +140,9 @@ is committed anywhere in this repository.
 |---|---|
 | http://localhost:8080 | **React SPA** — start here |
 | http://localhost:8080/lookup | Mobile quote lookup |
-| http://localhost:4200 | **Underwriter work queue** — the Angular module from the legacy portal (`npm start` in `src/legacy/PolicyFlow.Legacy.Underwriting`) |
+| http://localhost:8080/agent | **Agent workspace** — sign in, submit quotes, track your own quotes |
+| http://localhost:8080/underwriting | **Underwriter work queue — React** (modern SPA) |
+| http://localhost:4200 | **Underwriter work queue — Angular**, the module from the legacy portal (`npm start` in `src/legacy/PolicyFlow.Legacy.Underwriting`) |
 | http://localhost:8081/swagger | OpenAPI (Development only) |
 | http://localhost:8081/health/ready | Readiness with per-dependency detail |
 | http://localhost:8081/api/carriers | The carrier panel |
@@ -169,6 +171,15 @@ is committed anywhere in this repository.
 **Resize to phone width**, or open on a real phone at
 `http://<your-ip>:8080/lookup`, and look up the quote by number + surname.
 
+### The agent's side
+
+**http://localhost:8080/agent** — an agent signs in with any agent ID (the
+simulated identity provider issues a token; there is no password), submits quotes
+for clients, and sees every quote *they* submitted with its live status: the list
+refreshes itself while underwriting runs and stops once each quote has an outcome.
+Quotes are attributed from the token, so a second agent signing in sees only
+their own. **View** opens the quote's comparison page.
+
 ### The underwriter's side (Angular, in the legacy portal)
 
 Referred quotes land in an underwriter work queue — an Angular module hosted by
@@ -187,6 +198,12 @@ npm start                     # http://localhost:4200, proxies /api to :8081
 4. **Approve** — the carrier panel prices it and the quote becomes Rated; look it
    up at `/lookup` in the SPA and it can now be bought. **Request follow-up** keeps
    it in the queue and shows the applicant your note. **Decline** closes it.
+
+The **same work queue is built in React** at **http://localhost:8080/underwriting**
+(no extra step — it is part of the SPA). Both call the same `/api/underwriting`
+endpoints and neither holds a rule, so they behave identically; open them side by
+side to compare the frameworks. `docs/LEGACY-MODERNIZATION.md` has the
+concern-by-concern comparison.
 
 ### From the command line
 
@@ -263,8 +280,8 @@ dotnet build
 Domain and application tests need nothing running:
 
 ```bash
-dotnet test tests/PolicyFlow.Domain.Tests        # 161 tests, ~150ms
-dotnet test tests/PolicyFlow.Application.Tests   # 119 tests
+dotnet test tests/PolicyFlow.Domain.Tests        # 167 tests, ~150ms
+dotnet test tests/PolicyFlow.Application.Tests   # 125 tests
 ```
 
 **Integration tests require real SQL Server** — that is the point of them. The
@@ -281,13 +298,13 @@ export MSSQL_SA_PASSWORD=$(grep '^MSSQL_SA_PASSWORD=' .env | cut -d= -f2-)
 # PowerShell
 $env:MSSQL_SA_PASSWORD = (Get-Content .env | Select-String '^MSSQL_SA_PASSWORD=').ToString().Split('=',2)[1]
 
-dotnet test tests/PolicyFlow.Api.IntegrationTests   # 86 tests
+dotnet test tests/PolicyFlow.Api.IntegrationTests   # 92 tests
 ```
 
 Each run creates and drops its own database, so runs never interfere.
 
 ```bash
-dotnet test    # all 366
+dotnet test    # all 384
 ```
 
 ### Frontend
@@ -296,7 +313,7 @@ dotnet test    # all 366
 cd src/PolicyFlow.Web
 npm ci
 npm run lint
-npm run test:ci     # 41 tests with coverage
+npm run test:ci     # 104 tests with coverage
 npm run build
 ```
 
@@ -313,10 +330,10 @@ npm run build       # into PolicyFlow.Legacy.WebForms/Scripts/underwriting
 
 | Suite | Count | Notable |
 |---|---|---|
-| `PolicyFlow.Domain.Tests` | 161 | Every rating rule and boundary; every state transition, including underwriter decisions; culture-independent trace rendering |
-| `PolicyFlow.Application.Tests` | 119 | Redelivery is a no-op; legacy and modern channels rate identically; an approved referral prices exactly as the rating service does |
-| `PolicyFlow.Api.IntegrationTests` | 86 | **20 concurrent payments → 1 row**; 10 concurrent binds → 1 policy; **5 concurrent underwriter decisions → 1 recorded**; no stack traces leak |
-| `PolicyFlow.Web` (Vitest) | 41 | Retry reuses the idempotency key; polling stops at a terminal state |
+| `PolicyFlow.Domain.Tests` | 167 | Every rating rule and boundary; every state transition, including underwriter decisions; culture-independent trace rendering |
+| `PolicyFlow.Application.Tests` | 125 | Redelivery is a no-op; legacy and modern channels rate identically; an approved referral prices exactly as the rating service does |
+| `PolicyFlow.Api.IntegrationTests` | 92 | **20 concurrent payments → 1 row**; 10 concurrent binds → 1 policy; **5 concurrent underwriter decisions → 1 recorded**; an agent never sees another agent's quotes; no stack traces leak |
+| `PolicyFlow.Web` (Vitest) | 104 | Retry reuses the idempotency key; polling stops at a terminal state; the work queue ignores a stale response and a double-click; the agent token is never sent to customer or underwriter calls |
 | `PolicyFlow.Legacy.Underwriting` (Vitest) | 67 | A slow response cannot show the wrong quote; a 409 reloads what changed; Enter cannot post back the Web Forms page |
 
 ---

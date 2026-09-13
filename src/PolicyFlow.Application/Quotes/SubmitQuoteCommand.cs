@@ -20,6 +20,12 @@ public sealed record SubmitQuoteCommand
 
     /// <summary>Which client submitted this. Set by the controller, not the caller.</summary>
     public QuoteChannel Channel { get; init; } = QuoteChannel.Modern;
+
+    /// <summary>
+    /// The authenticated agent submitting the quote, or null when anonymous. Set by
+    /// the controller from the bearer token, never from the request body.
+    /// </summary>
+    public string? SubmittedBy { get; init; }
 }
 
 /// <summary>What the API returns with its 202 Accepted.</summary>
@@ -80,7 +86,8 @@ public sealed class SubmitQuoteHandler(
                 priorInsuranceMonths: command.PriorInsuranceMonths,
                 channel: command.Channel,
                 correlationId: correlationId,
-                nowUtc: now);
+                nowUtc: now,
+                submittedBy: command.SubmittedBy);
 
             await quotes.AddAsync(quote, token);
 

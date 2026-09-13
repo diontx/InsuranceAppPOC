@@ -24,6 +24,9 @@ public class Quote
     /// <summary>Longest underwriter identity the schema stores.</summary>
     public const int MaxReviewerLength = 120;
 
+    /// <summary>Longest submitting-agent identity the schema stores.</summary>
+    public const int MaxSubmitterLength = 120;
+
     // EF Core materialises entities through this constructor.
     private Quote() { }
 
@@ -72,6 +75,13 @@ public class Quote
     /// <summary>Traces this quote across API, SQL, Service Bus and worker logs.</summary>
     public string CorrelationId { get; private set; } = null!;
 
+    /// <summary>
+    /// The authenticated agent who submitted the quote. Null for an anonymous
+    /// submission (a self-service customer, or the legacy service principal), which
+    /// is therefore in no agent's list.
+    /// </summary>
+    public string? SubmittedBy { get; private set; }
+
     /// <summary>Identity of the underwriter who last acted on a referral.</summary>
     public string? ReviewedBy { get; private set; }
 
@@ -109,7 +119,8 @@ public class Quote
         int priorInsuranceMonths,
         QuoteChannel channel,
         string correlationId,
-        DateTime nowUtc)
+        DateTime nowUtc,
+        string? submittedBy = null)
     {
         if (string.IsNullOrWhiteSpace(quoteNumber))
         {
@@ -151,9 +162,16 @@ public class Quote
             throw new DomainException("Prior insurance months is outside the supported range.");
         }
 
+        var submitter = string.IsNullOrWhiteSpace(submittedBy) ? null : submittedBy.Trim();
+        if (submitter is { Length: > MaxSubmitterLength })
+        {
+            throw new DomainException($"Submitting agent identity must be {MaxSubmitterLength} characters or fewer.");
+        }
+
         return new Quote
         {
             Id = Guid.NewGuid(),
+            SubmittedBy = submitter,
             QuoteNumber = quoteNumber,
             CustomerName = customerName.Trim(),
             State = state.Trim().ToUpperInvariant(),

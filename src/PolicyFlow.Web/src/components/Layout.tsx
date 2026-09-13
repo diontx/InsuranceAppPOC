@@ -40,6 +40,12 @@ export function Layout() {
             <NavLink to="/lookup" className="site-nav__link">
               Find my quote
             </NavLink>
+            <NavLink to="/agent" className="site-nav__link">
+              Agent
+            </NavLink>
+            <NavLink to="/underwriting" className="site-nav__link">
+              Underwriting
+            </NavLink>
           </nav>
         </div>
       </header>

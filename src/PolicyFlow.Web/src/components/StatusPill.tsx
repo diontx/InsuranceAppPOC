@@ -2,6 +2,8 @@ import type { PolicyStatus, QuoteStatus } from '../api/types';
 
 interface StatusPillProps {
   status: QuoteStatus | PolicyStatus | string;
+  /** Display text when it should differ from the raw status, e.g. "Follow-up". */
+  label?: string;
 }
 
 /**
@@ -10,14 +12,14 @@ interface StatusPillProps {
  * Colour alone is never the only signal: the status word is always present, so
  * the component works for colour-blind users and in a monochrome print.
  */
-export function StatusPill({ status }: StatusPillProps) {
+export function StatusPill({ status, label }: StatusPillProps) {
   const modifier = status.toLowerCase();
   const isInFlight = modifier === 'pending' || modifier === 'processing';
 
   return (
     <span className={`pill pill--${modifier}`}>
       <span className="pill__dot" aria-hidden="true" />
-      {status}
+      {label ?? status}
       {isInFlight && <span className="sr-only"> — underwriting in progress</span>}
     </span>
   );

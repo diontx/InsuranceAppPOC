@@ -255,6 +255,45 @@ GET /api/quotes/lookup?quoteNumber=Q-2026-000002&lastName=Johnson
 Requires **both** parameters. A wrong surname returns a **byte-identical 404** to
 an unknown quote number, so the endpoint cannot enumerate valid quote numbers.
 
+### `GET /api/quotes/mine`
+
+**Policy** `quotes:read` · **Requires a bearer token**
+
+The quotes the signed-in agent submitted, newest first, capped at 100. Powers the
+agent workspace (`/agent` in the SPA).
+
+```json
+{
+  "submittedBy": "a.patel",
+  "items": [
+    { "quoteId": "…", "quoteNumber": "Q-2026-000016", "status": "Referral", "isTerminal": true,
+      "customerName": "Riley Chen", "decisionReason": "No prior insurance on record. …", "offerCount": 0 },
+    { "quoteId": "…", "quoteNumber": "Q-2026-000015", "status": "Rated", "isTerminal": true,
+      "customerName": "Morgan Lee", "annualPremium": 812.5, "offerCount": 15 }
+  ]
+}
+```
+
+Each item is the same `QuoteStatusView` as `GET /api/quotes/{quoteId}`, so a row
+and the quote's own page cannot disagree.
+
+**Attribution.** `POST /api/quotes` records the submitting agent from the token's
+`name` claim — never from the body, so an agent cannot file a quote under another
+agent's name. Anonymous submissions (self-service customers, the legacy service
+principal) are unattributed and appear in no agent's list. The agent's identity is
+not added to the status view, so the anonymous lookup cannot expose it.
+
+**401 without a token, even with `REQUIRE_AUTHENTICATION=false`.** Relaxed
+authorization makes the policies permissive, but "my quotes" means nothing
+without knowing who is asking. An invalid or expired token is also a 401.
+
+```bash
+TOKEN=$(curl -s -X POST http://localhost:8081/api/auth/dev-token \
+  -H "Content-Type: application/json" -d '{"role":"Agent","subject":"a.patel"}' \
+  | python -c "import sys,json; print(json.load(sys.stdin)['accessToken'])")
+curl -s http://localhost:8081/api/quotes/mine -H "Authorization: Bearer $TOKEN"
+```
+
 ---
 
 ## Policies
@@ -450,8 +489,9 @@ One carrier. 404 if unknown or inactive.
 
 ## Underwriting
 
-The underwriter work queue. Consumed by the Angular module that the legacy
-portal hosts in `Underwriting.aspx` — but these are **modern** endpoints
+The underwriter work queue. Consumed by two clients built for contrast: the
+Angular module that the legacy portal hosts in `Underwriting.aspx`, and the React
+SPA's `/underwriting` page. Both use these **modern** endpoints
 (camelCase, ProblemDetails), not the legacy seam: a new screen is built against
 the platform it will outlive the portal on.
 

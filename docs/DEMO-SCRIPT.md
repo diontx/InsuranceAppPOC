@@ -353,6 +353,29 @@ If there is time, open `src/legacy/PolicyFlow.Legacy.WebForms/QuoteEntry.aspx.cs
 
 ---
 
+## 7a. The agent's side — 45 seconds
+
+**Browser:** http://localhost:8080/agent
+
+Sign in as `a.patel`, then submit two quotes: one clean, one with prior coverage
+`0`. Point at **My quotes**:
+
+> Pending, then Rated or Referral, without touching Refresh. The list refreshes
+> while anything is in underwriting and goes quiet once everything has an outcome —
+> and it gives up after a couple of minutes, so a stuck quote cannot keep a tab
+> polling forever.
+
+Sign out and in as `m.okafor`:
+
+> Empty. Quotes are attributed from the token — there is no agent id in the request
+> for anyone to change — and "my quotes" filters on that same claim. Without a
+> token it is a 401 even in this relaxed demo, because the API cannot know whose
+> quotes to return.
+
+The referred quote from this step is the one to open in the underwriting queue next.
+
+---
+
 ## 8a. The underwriter's side — 60 seconds
 
 **Before:** `npm start` in `src/legacy/PolicyFlow.Legacy.Underwriting`, and submit
@@ -396,6 +419,17 @@ On why Angular inside Web Forms:
 > everything in one server-side form, so Enter in a search box would post the
 > whole page back — prevented, with a test. And it runs zoneless, so it is not
 > patching the ASP.NET AJAX library's timers on the same page.
+
+For contrast, open **http://localhost:8080/underwriting** beside it — the same
+queue built in React in the modern SPA:
+
+> Same API, same rules, same behaviour — it cannot differ, because neither UI owns a
+> rule. What differs is the framework and the host. In React the form resets by
+> remounting on a `key` and validation is derived during render; in Angular it is a
+> reactive form whose validators follow the decision. And three things the Angular
+> version has to handle — CORS, the Web Forms server form, and style scoping — are
+> not Angular at all. They are the cost of living inside the legacy page, and they
+> go away with it.
 
 If asked about concurrency:
 

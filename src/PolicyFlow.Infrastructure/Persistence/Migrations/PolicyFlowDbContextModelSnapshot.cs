@@ -392,6 +392,10 @@ namespace PolicyFlow.Infrastructure.Persistence.Migrations
                         .HasMaxLength(20)
                         .HasColumnType("nvarchar(20)");
 
+                    b.Property<string>("SubmittedBy")
+                        .HasMaxLength(120)
+                        .HasColumnType("nvarchar(120)");
+
                     b.Property<DateTime>("UpdatedUtc")
                         .HasColumnType("datetime2");
 
@@ -419,6 +423,9 @@ namespace PolicyFlow.Infrastructure.Persistence.Migrations
 
                     b.HasIndex("Status", "CreatedUtc")
                         .HasDatabaseName("IX_Quotes_Status_CreatedUtc");
+
+                    b.HasIndex("SubmittedBy", "CreatedUtc")
+                        .HasDatabaseName("IX_Quotes_SubmittedBy_CreatedUtc");
 
                     b.ToTable("Quotes", (string)null);
                 });

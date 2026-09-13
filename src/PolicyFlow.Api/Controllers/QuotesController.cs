@@ -56,7 +56,10 @@ public sealed class QuotesController(
             VehicleModel = request.VehicleModel,
             AnnualMileage = request.AnnualMileage,
             PriorInsuranceMonths = request.PriorInsuranceMonths,
-            Channel = Domain.Quotes.QuoteChannel.Modern
+            Channel = Domain.Quotes.QuoteChannel.Modern,
+            // From the token, never the body: an agent must not be able to file a
+            // quote under another agent's name. Anonymous submissions stay unattributed.
+            SubmittedBy = AuthenticatedName()
         };
 
         var validation = await validator.ValidateAsync(command, ct);
@@ -185,6 +188,46 @@ public sealed class QuotesController(
         return Ok(new QuoteLookupResponse { Quote = status, Comparison = comparison });
     }
 
+    /// <summary>Lists the quotes the signed-in agent submitted, newest first.</summary>
+    /// <remarks>
+    /// <para>
+    /// Powers the agent workspace. The agent is identified by the bearer token's
+    /// <c>name</c> claim, so the list can only ever be the caller's own quotes.
+    /// </para>
+    /// <para>
+    /// Returns 401 without a token even when <c>REQUIRE_AUTHENTICATION=false</c>.
+    /// Relaxed authorization makes the policies permissive, but "my quotes" has no
+    /// meaning without knowing who "my" is.
+    /// </para>
+    /// </remarks>
+    /// <response code="200">The agent's quotes, capped at 100.</response>
+    /// <response code="401">No bearer token identifying the caller.</response>
+    [HttpGet("mine")]
+    [Authorize(Policy = PolicyFlowPolicies.ReadQuotes)]
+    [ProducesResponseType(typeof(AgentQuotesResponse), StatusCodes.Status200OK)]
+    [ProducesResponseType(typeof(ProblemDetails), StatusCodes.Status401Unauthorized)]
+    public async Task<IActionResult> Mine(CancellationToken ct)
+    {
+        var agent = AuthenticatedName();
+        if (agent is null)
+        {
+            return Unauthorized(new ProblemDetails
+            {
+                Status = StatusCodes.Status401Unauthorized,
+                Title = "Sign-in required",
+                Type = "https://policyflow.example/problems/sign-in-required",
+                Detail = "Listing your quotes requires a bearer token that identifies you."
+            });
+        }
+
+        var items = await getQuote.ListSubmittedByAsync(agent, ct);
+        return Ok(new AgentQuotesResponse { SubmittedBy = agent, Items = items });
+    }
+
+    /// <summary>The caller's identity from the token, or null when anonymous.</summary>
+    private string? AuthenticatedName() =>
+        User.Identity is { IsAuthenticated: true, Name: { Length: > 0 } name } ? name : null;
+
     private static ProblemDetails NotFoundProblem(Guid quoteId) => new()
     {
         Status = StatusCodes.Status404NotFound,
@@ -204,4 +247,14 @@ public sealed record QuoteLookupResponse
 
     /// <summary>Null unless the quote is rated with offers.</summary>
     public QuoteComparisonDocument? Comparison { get; init; }
+}
+
+/// <summary>Response for <c>GET /api/quotes/mine</c>.</summary>
+public sealed record AgentQuotesResponse
+{
+    /// <summary>The agent the list belongs to, as the token identified them.</summary>
+    public required string SubmittedBy { get; init; }
+
+    /// <summary>Newest first.</summary>
+    public required IReadOnlyList<QuoteStatusView> Items { get; init; }
 }

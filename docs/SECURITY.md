@@ -127,6 +127,21 @@ from the request body; with authentication relaxed it is recorded as
 `demo-underwriter (unauthenticated)` so demo data cannot pass for a real audit
 trail.
 
+**An agent's quotes are attributed from the token, and listed only from the
+token.** `POST /api/quotes` stores the token's `name` claim as `SubmittedBy`;
+`GET /api/quotes/mine` filters on the same claim and returns 401 without one, even
+with authorization relaxed. There is no agent id in any request body or query
+string to tamper with.
+
+**The agent workspace's browser token is POC-only.** The SPA signs an agent in by
+calling the dev-token endpoint and keeps the token in `sessionStorage`, so it ends
+with the tab — but any token JavaScript can read is exposed to an XSS flaw.
+Production signs in through Entra ID with MSAL, holds tokens in memory and refreshes
+them silently. The SPA also sends the token only on agent calls (submitting as the
+agent, listing their quotes): customer and underwriter pages on the same browser
+stay anonymous, so an underwriting decision is never recorded under an agent's
+identity.
+
 **Binding is agent-only.** A self-service customer token must not be able to
 create a financial obligation.
 

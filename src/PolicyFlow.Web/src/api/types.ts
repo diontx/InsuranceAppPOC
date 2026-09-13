@@ -205,3 +205,103 @@ export interface ProblemDetails {
   correlationId?: string;
   traceId?: string;
 }
+
+/** Response body for `GET /api/quotes/mine`. */
+export interface AgentQuotesResponse {
+  /** The agent the list belongs to, as the token identified them. */
+  submittedBy: string;
+  /** Newest first. */
+  items: QuoteStatusView[];
+}
+
+/** Response body for `POST /api/auth/dev-token` (simulated identity provider). */
+export interface DevTokenResponse {
+  accessToken: string;
+  tokenType: string;
+  expiresInSeconds: number;
+  role: string;
+  scopes: string[];
+  warning: string;
+}
+
+// ---------------------------------------------------------------------------
+// Underwriting work queue (`/api/underwriting`). Mirrors UnderwritingViews.cs.
+// The Angular module in the legacy portal consumes the identical contract.
+// ---------------------------------------------------------------------------
+
+/** The two statuses that put a quote in the underwriter work queue. */
+export type QueueStatus = 'Referral' | 'FollowUp';
+
+/** Decision names the API accepts. */
+export type ReviewDecision = 'Approve' | 'FollowUp' | 'Decline';
+
+export interface UnderwritingQueueItem {
+  quoteId: string;
+  quoteNumber: string;
+  customerName: string;
+  state: string;
+  vehicleDescription: string;
+  status: QueueStatus;
+  /** Why it was referred, or what the follow-up asked for. */
+  reason?: string;
+  channel: 'Modern' | 'LegacyWebForms';
+  submittedUtc: string;
+  updatedUtc: string;
+  reviewedBy?: string;
+}
+
+export interface UnderwritingQueue {
+  /** Oldest submission first. */
+  items: UnderwritingQueueItem[];
+  referralCount: number;
+  followUpCount: number;
+  /** True when the server capped the list. */
+  isTruncated: boolean;
+  generatedUtc: string;
+}
+
+export interface CarrierAppetite {
+  carrierId: string;
+  carrierName: string;
+  willWrite: boolean;
+  /** Present only when the carrier will not write the risk. */
+  reason?: string;
+}
+
+export interface UnderwritingReview {
+  quoteId: string;
+  quoteNumber: string;
+  status: QuoteStatus;
+  /** False once a decision has closed the referral. */
+  isAwaitingReview: boolean;
+  customerName: string;
+  state: string;
+  vehicleYear: number;
+  vehicleMake: string;
+  vehicleModel: string;
+  annualMileage: number;
+  priorInsuranceMonths: number;
+  channel: 'Modern' | 'LegacyWebForms';
+  correlationId: string;
+  submittedUtc: string;
+  updatedUtc: string;
+  /** Referral reason, follow-up request or decline reason. */
+  decisionReason?: string;
+  /** Computed by the domain's rating service; the client knows no rules. */
+  eligibilityOutcome: 'Eligible' | 'Refer' | 'Decline';
+  baselineAnnualPremium?: number;
+  eligibilityTrace: string[];
+  carrierAppetite: CarrierAppetite[];
+  reviewedBy?: string;
+  reviewedUtc?: string;
+  reviewNote?: string;
+  annualPremium?: number;
+  bestCarrierId?: string;
+  offerCount: number;
+}
+
+/** Request body for `POST /api/underwriting/quotes/{quoteId}/decision`. */
+export interface ReviewDecisionRequest {
+  decision: ReviewDecision;
+  note?: string;
+}

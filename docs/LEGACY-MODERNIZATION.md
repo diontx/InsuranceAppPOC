@@ -240,6 +240,34 @@ npm run build      # → PolicyFlow.Legacy.WebForms/Scripts/underwriting/
 npm start          # or: dev server on http://localhost:4200 inside a copy of the portal chrome
 ```
 
+### The same screen in React, for contrast
+
+The modern SPA has the identical work queue at `/underwriting`
+(`src/PolicyFlow.Web/src/pages/UnderwritingPage.tsx`). Same API, same rules —
+because the rules are in the API — so any difference between the two is the
+framework or the host, never the business behaviour.
+
+| Concern | Angular module in the legacy portal | React page in the modern SPA |
+|---|---|---|
+| Host | `Underwriting.aspx`, inside the master page's `<form runat="server">` | A route in the SPA shell |
+| Reaching the API | Cross-origin; base address from `Web.config` via `data-api-base`; needs a CORS allowlist entry | Same-origin `/api` through nginx (Vite proxy in dev); no CORS |
+| State | `UnderwritingStore`: injectable service holding signals | `useUnderwritingWorkbench`: custom hook with `useState` and refs |
+| Slow response for a quote no longer open | Selection version counter | Version counter plus `AbortController` |
+| Double-click on the decision | Signal read synchronously | A ref — state inside the callback is the stale value from its render |
+| Form | Reactive forms; note validators swapped when the decision changes | Controlled inputs; validation derived during render |
+| Clean form for a new quote | Effect comparing review identity, then `form.reset()` | `key={quoteId:updatedUtc}` remounts the component |
+| Server 400 on the note | A validator tied to the note text — `setErrors()` is discarded when `formControlName` attaches | Derived: shown while the note equals the one rejected |
+| Re-rendering after form state changes | Zoneless + OnPush needs `markForCheck()` | `setState` re-renders; nothing extra |
+| Enter in the search box | Must suppress implicit submission of the server form | No enclosing form; nothing to do |
+| Styles | Every rule scoped under `uw-workbench` so it cannot touch `legacy.css` | Shared design tokens in `app.css` |
+| Correlation id | Functional HTTP interceptor sets one per request | API generates it; surfaced from ProblemDetails |
+| Tests | 67 Vitest specs (Angular builder, TestBed) | 40 Vitest + Testing Library tests |
+
+Three of those rows — CORS, the server form, and style scoping — are costs of
+hosting inside Web Forms, not of Angular. They are the price of shipping a new
+screen to agents *now*, in the portal they already use, and they disappear when
+the portal is retired.
+
 ---
 
 ## Why not just rewrite it?
@@ -333,7 +361,7 @@ architecture is how a "transitional" layer survives a decade.
 | Bind a policy | ❌ | ✅ |
 | Take a payment | ❌ | ✅ |
 | Mobile-usable | ⚠️ minimal reflow only | ✅ mobile-first |
-| Underwriter work queue | ✅ Angular module in `Underwriting.aspx`, against `/api` | — internal tool; applicants see the follow-up request |
+| Underwriter work queue | ✅ Angular module in `Underwriting.aspx`, against `/api` | ✅ `/underwriting`, same API — built for side-by-side contrast |
 | Business logic held locally | ❌ **none** (Web Forms or Angular) | ❌ **none** |
 
 The last row is the one that matters. No UI owns a business rule.
