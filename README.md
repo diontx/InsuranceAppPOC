@@ -545,6 +545,7 @@ docker compose up --build
 |---|---|
 | `docs/ARCHITECTURE.md` | Design decisions and their reasoning; what is simulated |
 | `docs/API.md` | Full endpoint reference with request/response examples |
+| `docs/STRANGLER-FIG-PLAN.md` | **Executive plan** for retiring the legacy portal: phases, gates, risks, decisions |
 | `docs/LEGACY-MODERNIZATION.md` | The seam, Web Forms mechanics, migration strategy |
 | `docs/SECURITY.md` | Controls implemented, and every production gap |
 | `docs/DEMO-SCRIPT.md` | Timed five-minute walkthrough |
